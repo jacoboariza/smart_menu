@@ -83,3 +83,29 @@ export async function upsertOccupancySignals(signals) {
   await safeWrite(OCC_FILE, TMP_OCC, next)
   return upserted
 }
+
+/**
+ * List menu items, optionally filtered by restaurantId
+ * @param {string} [restaurantId]
+ * @returns {Promise<any[]>}
+ */
+export async function listMenuItems(restaurantId) {
+  const items = await loadJson(MENU_FILE)
+  if (restaurantId) {
+    return items.filter((it) => it.restaurantId === restaurantId)
+  }
+  return items
+}
+
+/**
+ * List occupancy signals, optionally filtered by restaurantId
+ * @param {string} [restaurantId]
+ * @returns {Promise<any[]>}
+ */
+export async function listOccupancySignals(restaurantId) {
+  const signals = await loadJson(OCC_FILE)
+  if (restaurantId) {
+    return signals.filter((s) => s.restaurantId === restaurantId)
+  }
+  return signals
+}
