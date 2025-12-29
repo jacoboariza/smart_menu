@@ -1,5 +1,33 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, Code, Copy, Download, Eye, FileText, Globe, Image, Leaf, Lightbulb, Link, Loader2, MapPin, Phone, Plus, Rocket, Sparkles, Upload, Utensils, X, Zap } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  Code,
+  Copy,
+  Download,
+  Dumbbell,
+  Eye,
+  FileText,
+  Globe,
+  Image,
+  Leaf,
+  Lightbulb,
+  Link,
+  Loader2,
+  MapPin,
+  Phone,
+  Plus,
+  Rocket,
+  Salad,
+  Sparkles,
+  Upload,
+  Utensils,
+  Video,
+  X,
+  Zap,
+  Cookie,
+  Droplets,
+} from 'lucide-react'
 import { useRef } from 'react'
 
 function uid() {
@@ -20,6 +48,8 @@ export default function App() {
   const [restaurantCity, setRestaurantCity] = useState('')
   const [restaurantPostalCode, setRestaurantPostalCode] = useState('')
   const [restaurantCountry, setRestaurantCountry] = useState('ES')
+  const [restaurantLicense, setRestaurantLicense] = useState('https://creativecommons.org/licenses/by/4.0/')
+  const [dataSharingScope, setDataSharingScope] = useState('public')
   const [sections, setSections] = useState([])
   const [newSectionName, setNewSectionName] = useState('')
   const fileInputRef = useRef(null)
@@ -50,6 +80,8 @@ export default function App() {
         if (json.telephone) setRestaurantPhone(json.telephone)
         if (json.url) setRestaurantUrl(json.url)
         if (json.servesCuisine) setRestaurantCuisine(json.servesCuisine)
+        if (json.license) setRestaurantLicense(json.license)
+        if (json.dataSharingScope) setDataSharingScope(json.dataSharingScope)
         if (json.address) {
           setRestaurantStreet(json.address.streetAddress || '')
           setRestaurantCity(json.address.addressLocality || '')
@@ -63,15 +95,22 @@ export default function App() {
           name: sec.name || 'Sin nombre',
           items: (sec.hasMenuItem || []).map((item) => {
             const diets = item.suitableForDiet || []
+            const nutrition = item.nutrition || {}
             return {
               id: uid(),
               name: item.name || '',
               description: item.description || '',
               image: item.image || '',
+              video: item.video || '',
+              ingredients: Array.isArray(item.recipeIngredient) ? item.recipeIngredient.join(', ') : '',
               calories: item.nutrition?.calories?.replace(' calories', '') || '',
+              protein: nutrition?.proteinContent?.replace(' grams', '') || '',
+              carbs: nutrition?.carbohydrateContent?.replace(' grams', '') || '',
+              fat: nutrition?.fatContent?.replace(' grams', '') || '',
               price: Number(item.offers?.price) || 0,
               currency: item.offers?.priceCurrency || 'EUR',
               isVegan: diets.includes('https://schema.org/VeganDiet'),
+              isVegetarian: diets.includes('https://schema.org/VegetarianDiet'),
               isGlutenFree: diets.includes('https://schema.org/GlutenFreeDiet'),
               isAvailable: item.offers?.availability !== 'https://schema.org/OutOfStock',
             }
@@ -576,6 +615,10 @@ Responde SOLO con el JSON:`
       '@context': 'https://schema.org',
       '@type': 'Restaurant',
       name: restaurantName || 'Restaurante',
+      isAccessibleForFree: true,
+      license: restaurantLicense || undefined,
+      termsOfService: restaurantUrl ? `${restaurantUrl}/terminos` : undefined,
+      'dataSharingScope': dataSharingScope,
     }
     
     if (restaurantImage) obj.image = restaurantImage
@@ -606,11 +649,15 @@ Responde SOLO con el JSON:`
           }
           
           if (item.image) menuItem.image = item.image
+          if (item.video) menuItem.video = item.video
           
-          if (item.calories) {
+          if (item.calories || item.protein || item.carbs || item.fat) {
             menuItem.nutrition = {
               '@type': 'NutritionInformation',
-              calories: `${item.calories} calories`,
+              ...(item.calories && { calories: `${item.calories} calories` }),
+              ...(item.protein && { proteinContent: `${item.protein} grams` }),
+              ...(item.carbs && { carbohydrateContent: `${item.carbs} grams` }),
+              ...(item.fat && { fatContent: `${item.fat} grams` }),
             }
           }
           
@@ -625,9 +672,14 @@ Responde SOLO con el JSON:`
           
           const diets = [
             ...(item.isVegan ? ['https://schema.org/VeganDiet'] : []),
+            ...(item.isVegetarian ? ['https://schema.org/VegetarianDiet'] : []),
             ...(item.isGlutenFree ? ['https://schema.org/GlutenFreeDiet'] : []),
           ]
           if (diets.length > 0) menuItem.suitableForDiet = diets
+
+          if (item.ingredients?.length) {
+            menuItem.recipeIngredient = item.ingredients.split(',').map((i) => i.trim()).filter(Boolean)
+          }
           
           return menuItem
         }),
@@ -635,11 +687,102 @@ Responde SOLO con el JSON:`
     }
     
     return obj
-  }, [restaurantName, restaurantImage, restaurantPhone, restaurantUrl, restaurantCuisine, restaurantStreet, restaurantCity, restaurantPostalCode, restaurantCountry, sections])
+  }, [
+    restaurantName,
+    restaurantImage,
+    restaurantPhone,
+    restaurantUrl,
+    restaurantCuisine,
+    restaurantStreet,
+    restaurantCity,
+    restaurantPostalCode,
+    restaurantCountry,
+    restaurantLicense,
+    dataSharingScope,
+    sections,
+  ])
 
   const jsonLdString = useMemo(() => {
     return JSON.stringify(jsonLdObject, null, 2)
   }, [jsonLdObject])
+
+  const turtleString = useMemo(() => {
+    const lines = [
+      '@prefix schema: <https://schema.org/> .',
+      '',
+      '<#restaurant> a schema:Restaurant ;',
+      `  schema:name """${restaurantName || 'Restaurante'}""" ;`,
+      ...(restaurantLicense ? [`  schema:license <${restaurantLicense}> ;`] : []),
+      ...(restaurantUrl ? [`  schema:url <${restaurantUrl}> ;`] : []),
+      ...(restaurantCuisine ? [`  schema:servesCuisine """${restaurantCuisine}""" ;`] : []),
+      ...(restaurantPhone ? [`  schema:telephone "${restaurantPhone}" ;`] : []),
+      ...(restaurantStreet || restaurantCity
+        ? [
+            '  schema:address [',
+            '    a schema:PostalAddress ;',
+            ...(restaurantStreet ? [`    schema:streetAddress """${restaurantStreet}""" ;`] : []),
+            ...(restaurantCity ? [`    schema:addressLocality """${restaurantCity}""" ;`] : []),
+            ...(restaurantPostalCode ? [`    schema:postalCode "${restaurantPostalCode}" ;`] : []),
+            ...(restaurantCountry ? [`    schema:addressCountry "${restaurantCountry}" ;`] : []),
+            '  ] ;',
+          ]
+        : []),
+      '  schema:hasMenu <#menu> .',
+      '',
+      '<#menu> a schema:Menu ;',
+      '  schema:hasMenuSection ',
+    ]
+
+    sections.forEach((section, sIndex) => {
+      const secNode = `<#section-${sIndex}>`
+      lines.push(`  ${secNode}${sIndex === sections.length - 1 ? ' .' : ' ,'}`)
+      lines.push('')
+      lines.push(`${secNode} a schema:MenuSection ;`)
+      lines.push(`  schema:name """${section.name}""" ;`)
+      if (section.items.length) {
+        lines.push('  schema:hasMenuItem ')
+        section.items.forEach((item, iIndex) => {
+          const itemNode = `<#item-${sIndex}-${iIndex}>`
+          lines.push(`    ${itemNode}${iIndex === section.items.length - 1 ? ' .' : ' ,'}`)
+          lines.push('')
+          lines.push(`${itemNode} a schema:MenuItem ;`)
+          lines.push(`  schema:name """${item.name}""" ;`)
+          if (item.description) lines.push(`  schema:description """${item.description}""" ;`)
+          if (item.image) lines.push(`  schema:image <${item.image}> ;`)
+          if (item.video) lines.push(`  schema:video <${item.video}> ;`)
+          if (item.ingredients)
+            item.ingredients.split(',').map((i) => i.trim()).filter(Boolean).forEach((ing) => {
+              lines.push(`  schema:recipeIngredient """${ing}""" ;`)
+            })
+          if (item.calories) lines.push(`  schema:nutrition [ a schema:NutritionInformation ; schema:calories "${item.calories} calories" ] ;`)
+          lines.push(
+            `  schema:offers [ a schema:Offer ; schema:price "${Number(item.price || 0).toFixed(2)}" ; schema:priceCurrency "${
+              item.currency || 'EUR'
+            }" ; schema:availability "${item.isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'}" ] ;`,
+          )
+          const diets = [
+            ...(item.isVegan ? ['https://schema.org/VeganDiet'] : []),
+            ...(item.isVegetarian ? ['https://schema.org/VegetarianDiet'] : []),
+            ...(item.isGlutenFree ? ['https://schema.org/GlutenFreeDiet'] : []),
+          ]
+          diets.forEach((diet) => lines.push(`  schema:suitableForDiet <${diet}> ;`))
+        })
+      }
+    })
+
+    return lines.join('\n')
+  }, [
+    restaurantName,
+    restaurantLicense,
+    restaurantUrl,
+    restaurantCuisine,
+    restaurantPhone,
+    restaurantStreet,
+    restaurantCity,
+    restaurantPostalCode,
+    restaurantCountry,
+    sections,
+  ])
 
   function addSection() {
     const name = newSectionName.trim()
@@ -678,12 +821,18 @@ Responde SOLO con el JSON:`
             {
               id: uid(),
               name: 'Nuevo plato',
-              description: 'Descripción del plato',
+              description: '',
               image: '',
+              video: '',
+              ingredients: '',
               calories: '',
-              price: 0,
+              protein: '',
+              carbs: '',
+              fat: '',
+              price: 10,
               currency,
               isVegan: false,
+              isVegetarian: false,
               isGlutenFree: false,
               isAvailable: true,
             },
@@ -731,6 +880,18 @@ Responde SOLO con el JSON:`
     navigator.clipboard.writeText(scriptTag)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function downloadTurtle() {
+    const blob = new Blob([turtleString], { type: 'text/turtle' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'menu-semantico.ttl'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const htmlSnippet = `<!-- Pega esto dentro del <head> de tu web -->
@@ -1009,7 +1170,30 @@ ${jsonLdString}
                     </div>
                   )}
                 </div>
-                <div className="sm:col-span-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Licencia de los datos</label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    value={restaurantLicense}
+                    onChange={(e) => setRestaurantLicense(e.target.value)}
+                    placeholder="https://creativecommons.org/licenses/by/4.0/"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">Incluye la URL de la licencia (ej. CC BY 4.0).</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Ámbito de compartición</label>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    value={dataSharingScope}
+                    onChange={(e) => setDataSharingScope(e.target.value)}
+                  >
+                    <option value="public">Público</option>
+                    <option value="partners">Partners</option>
+                    <option value="private">Privado</option>
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">Controla la difusión del menú en espacios de datos.</p>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
                     <Image className="h-3 w-3 inline mr-1" />URL Imagen de Portada
                   </label>
@@ -1205,14 +1389,63 @@ ${jsonLdString}
                                 />
                               </div>
                               <div className="flex items-center gap-2">
-                                <Zap className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                <Video className="h-4 w-4 text-indigo-500 flex-shrink-0" />
                                 <input
-                                  className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.calories || ''}
-                                  onChange={(e) => updateItem(section.id, item.id, { calories: e.target.value })}
-                                  placeholder="Calorías"
+                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
+                                  value={item.video || ''}
+                                  onChange={(e) => updateItem(section.id, item.id, { video: e.target.value })}
+                                  placeholder="URL video corto (mp4/webm/Reel)"
                                 />
-                                <span className="text-xs text-slate-500">kcal</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <div className="flex items-center gap-2">
+                                <Salad className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                <input
+                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
+                                  value={item.ingredients || ''}
+                                  onChange={(e) => updateItem(section.id, item.id, { ingredients: e.target.value })}
+                                  placeholder="Ingredientes separados por comas"
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Zap className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                  <input
+                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
+                                    value={item.calories || ''}
+                                    onChange={(e) => updateItem(section.id, item.id, { calories: e.target.value })}
+                                    placeholder="kcal"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Dumbbell className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                  <input
+                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
+                                    value={item.protein || ''}
+                                    onChange={(e) => updateItem(section.id, item.id, { protein: e.target.value })}
+                                    placeholder="prot g"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Cookie className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                                  <input
+                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
+                                    value={item.carbs || ''}
+                                    onChange={(e) => updateItem(section.id, item.id, { carbs: e.target.value })}
+                                    placeholder="carbs g"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Droplets className="h-4 w-4 text-pink-500 flex-shrink-0" />
+                                  <input
+                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
+                                    value={item.fat || ''}
+                                    onChange={(e) => updateItem(section.id, item.id, { fat: e.target.value })}
+                                    placeholder="grasa g"
+                                  />
+                                </div>
                               </div>
                             </div>
 
@@ -1228,6 +1461,18 @@ ${jsonLdString}
                                   <Leaf className="h-4 w-4 text-emerald-600" />
                                   Vegano
                                 </span>
+                              </label>
+
+                              <label className="inline-flex items-center gap-2 text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-200"
+                                  checked={item.isVegetarian}
+                                  onChange={(e) =>
+                                    updateItem(section.id, item.id, { isVegetarian: e.target.checked })
+                                  }
+                                />
+                                Vegetariano
                               </label>
 
                               <label className="inline-flex items-center gap-2 text-slate-700">
@@ -1441,6 +1686,14 @@ ${jsonLdString}
                     >
                       <Download className="h-3.5 w-3.5" />
                       Descargar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadTurtle}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Descargar TTL
                     </button>
                   </div>
                 </div>

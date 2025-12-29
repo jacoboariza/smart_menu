@@ -1,0 +1,26 @@
+{
+  "restaurantId": "resto-123",
+  "currency": "EUR",
+  "items": [
+    {
+      "id": "item-1",
+      "name": "Ensalada verde",
+      "description": "Lechuga, tomate, pepino",
+      "price": 8.5,
+      "category": "Entrantes",
+      "allergens": ["frutos secos"],
+      "glutenFree": true,
+      "vegan": true
+    },
+    {
+      "id": "item-2",
+      "name": "Pasta boloñesa",
+      "description": "Salsa de carne y tomate",
+      "price": 12.0,
+      "category": "Principales",
+      "allergens": ["gluten"],
+      "glutenFree": false,
+      "vegan": false
+    }
+  ]
+}

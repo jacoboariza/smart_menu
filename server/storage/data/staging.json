@@ -1,0 +1,43 @@
+[
+  {
+    "id": "b73ffc29-1efa-4bd2-bf3c-e38def27be8f",
+    "source": "menu",
+    "orgId": "org-1",
+    "receivedAt": "2025-01-02T00:00:00Z",
+    "payload": {
+      "restaurantId": "resto-xyz",
+      "currency": "EUR",
+      "items": [
+        {
+          "id": "item-1",
+          "name": " Plato Especial ",
+          "description": " Con algo ",
+          "price": 10,
+          "category": " Especial ",
+          "allergens": [
+            "GLUTEN",
+            "Frutos Secos "
+          ],
+          "glutenFree": false,
+          "vegan": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "06ccbefd-57e7-40cb-a746-8d8039e0ef86",
+    "source": "occupancy",
+    "orgId": "org-1",
+    "receivedAt": "2025-01-02T00:00:00Z",
+    "payload": {
+      "restaurantId": "resto-xyz",
+      "signals": [
+        {
+          "ts": "2025-01-01T00:00:00Z",
+          "occupiedSeats": 25,
+          "capacitySeats": 50
+        }
+      ]
+    }
+  }
+]

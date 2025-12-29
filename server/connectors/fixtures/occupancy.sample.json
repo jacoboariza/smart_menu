@@ -1,0 +1,14 @@
+{
+  "restaurantId": "resto-123",
+  "signals": [
+    {
+      "ts": "2025-01-01T12:00:00.000Z",
+      "occupancyPct": 65
+    },
+    {
+      "ts": "2025-01-01T13:00:00.000Z",
+      "occupiedSeats": 40,
+      "capacitySeats": 80
+    }
+  ]
+}
