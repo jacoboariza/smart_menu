@@ -26,9 +26,9 @@ async function safeWrite(file, tmp, data) {
 
 async function loadJson(file) {
   await ensureFiles()
-  const txt = await fs.readFile(file, 'utf8')
-  if (!txt.trim()) return []
   try {
+    const txt = await fs.readFile(file, 'utf8')
+    if (!txt.trim()) return []
     const parsed = JSON.parse(txt)
     return Array.isArray(parsed) ? parsed : []
   } catch {

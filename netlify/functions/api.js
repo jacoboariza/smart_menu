@@ -4,6 +4,10 @@ import {
   upsertMenuItems,
   upsertOccupancySignals,
 } from '../../server/storage/normalizedRepo.js'
+import { getById as getDataProduct } from '../../server/storage/dataProductRepo.js'
+import { list as listAudit } from '../../server/storage/auditRepo.js'
+import { segitturAdapter } from '../../server/adapters/SegitturAdapterMock.js'
+import { gaiaXAdapter } from '../../server/adapters/GaiaXAdapterMock.js'
 
 function buildResponse(statusCode, body) {
   return {
@@ -35,14 +39,70 @@ function parseSource(path) {
   return parts[idx + 1]
 }
 
+function parsePublishSpace(path) {
+  const normalized = path.replace(/\/*$/, '')
+  const parts = normalized.split('/')
+  const idx = parts.indexOf('publish')
+  if (idx === -1 || !parts[idx + 1]) return null
+  return parts[idx + 1]
+}
+
+function parseConsumeParams(path) {
+  const normalized = path.replace(/\/*$/, '')
+  const parts = normalized.split('/')
+  const idx = parts.indexOf('consume')
+  if (idx === -1 || !parts[idx + 1] || !parts[idx + 2]) return null
+  return { space: parts[idx + 1], productId: parts[idx + 2] }
+}
+
+function isAuditLogs(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/audit/logs') || normalized.includes('/audit/logs')
+}
+
+function getAdapterForSpace(space) {
+  if (space === 'segittur') return segitturAdapter
+  if (space === 'gaiax') return gaiaXAdapter
+  return null
+}
+
 function isNormalizeRun(path) {
   const normalized = path.replace(/\/*$/, '')
   return normalized.endsWith('/normalize/run') || normalized.includes('/normalize/run')
 }
 
 export async function handler(event, context) {
-  const isPost = event.httpMethod === 'POST'
-  if (!isPost) {
+  const method = event.httpMethod
+  const path = event.path || ''
+
+  // GET endpoints
+  if (method === 'GET') {
+    if (!requireAuth(event)) {
+      return buildResponse(401, { error: { code: 'unauthorized', message: 'Missing or invalid API key' } })
+    }
+
+    // GET /audit/logs
+    if (isAuditLogs(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const filters = {}
+        if (params.action) filters.action = params.action
+        if (params.productId) filters.productId = params.productId
+        if (params.space) filters.space = params.space
+        if (params.since) filters.since = params.since
+
+        const logs = await listAudit(filters)
+        return buildResponse(200, { logs })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'audit_error', message: err.message } })
+      }
+    }
+
+    return buildResponse(404, { error: { code: 'not_found', message: 'Endpoint not found' } })
+  }
+
+  // POST endpoints
+  if (method !== 'POST') {
     return buildResponse(405, { error: { code: 'method_not_allowed', message: 'Method not allowed' } })
   }
 
@@ -56,6 +116,72 @@ export async function handler(event, context) {
     requestId: context.awsRequestId || context.invokedFunctionArn || null,
     receivedAt: new Date().toISOString(),
     roles: [],
+  }
+
+  // Parse body for POST endpoints
+  let body
+  try {
+    body = event.body ? JSON.parse(event.body) : {}
+  } catch (err) {
+    return buildResponse(400, { error: { code: 'invalid_json', message: 'Invalid JSON body' } })
+  }
+
+  // Parse roles from header
+  const rolesHeader = event.headers?.['x-roles'] || event.headers?.['X-Roles'] || ''
+  const roles = rolesHeader ? rolesHeader.split(',').map((r) => r.trim()) : []
+  const actor = { orgId: orgId || 'anonymous', roles }
+
+  // POST /publish/:space
+  const publishSpace = parsePublishSpace(path)
+  if (publishSpace) {
+    const adapter = getAdapterForSpace(publishSpace)
+    if (!adapter) {
+      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${publishSpace}' not supported` } })
+    }
+
+    const { productId } = body
+    if (!productId) {
+      return buildResponse(400, { error: { code: 'missing_product_id', message: 'productId required' } })
+    }
+
+    try {
+      const dataProduct = await getDataProduct(productId)
+      if (!dataProduct) {
+        return buildResponse(404, { error: { code: 'product_not_found', message: 'Data product not found' } })
+      }
+
+      const result = await adapter.publish(publishSpace, dataProduct, actor)
+      return buildResponse(200, { space: publishSpace, productId: result.id })
+    } catch (err) {
+      return buildResponse(500, { error: { code: 'publish_error', message: err.message } })
+    }
+  }
+
+  // POST /consume/:space/:productId
+  const consumeParams = parseConsumeParams(path)
+  if (consumeParams) {
+    const { space, productId } = consumeParams
+    const adapter = getAdapterForSpace(space)
+    if (!adapter) {
+      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${space}' not supported` } })
+    }
+
+    const { purpose } = body
+    if (!purpose) {
+      return buildResponse(400, { error: { code: 'missing_purpose', message: 'purpose required' } })
+    }
+
+    try {
+      const result = await adapter.consume(space, productId, actor, purpose)
+
+      if (result.denied) {
+        return buildResponse(403, { error: { code: 'access_denied', message: result.reason } })
+      }
+
+      return buildResponse(200, { dataProduct: result.dataProduct, payload: result.payload })
+    } catch (err) {
+      return buildResponse(500, { error: { code: 'consume_error', message: err.message } })
+    }
   }
 
   // Normalize endpoint
@@ -109,13 +235,6 @@ export async function handler(event, context) {
     connector = getConnectorBySource(source)
   } catch (err) {
     return buildResponse(404, { error: { code: 'connector_not_found', message: err.message } })
-  }
-
-  let body
-  try {
-    body = event.body ? JSON.parse(event.body) : {}
-  } catch (err) {
-    return buildResponse(400, { error: { code: 'invalid_json', message: 'Invalid JSON body' } })
   }
 
   try {
