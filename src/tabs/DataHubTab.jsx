@@ -58,6 +58,8 @@ export default function DataHubTab({ editorState }) {
   const [auditError, setAuditError] = useState(null)
   const [auditLogs, setAuditLogs] = useState([])
 
+  const [dataSpaceDemoLoading, setDataSpaceDemoLoading] = useState(false)
+
   useEffect(() => {
     if (!selectedDataProduct?.id) return
     setAuditFilters((prev) => {
@@ -312,6 +314,124 @@ export default function DataHubTab({ editorState }) {
   function stepLog(label, status) {
     const suffix = status === 'ok' ? ' ✅' : status === 'error' ? ' ❌' : ''
     pushLog({ ts: new Date().toISOString(), action: `${label}${suffix}`, status })
+  }
+
+  async function runTimedStep(label, fn, { allow403 = false } = {}) {
+    const start = performance.now()
+    try {
+      const res = await fn()
+      const ms = Math.round(performance.now() - start)
+      stepLog(`${label} (${ms}ms)`, 'ok')
+      return { ok: true, res }
+    } catch (err) {
+      const ms = Math.round(performance.now() - start)
+      if (allow403 && err?.status === 403) {
+        stepLog(`${label} — DENIED (${ms}ms)`, 'ok')
+        return { ok: false, denied: true, err }
+      }
+      stepLog(`${label} (${ms}ms)`, 'error')
+      throw err
+    }
+  }
+
+  async function runDataSpaceDemoMenu() {
+    setLastError(null)
+    setAuditError(null)
+    setPublishError(null)
+    setConsumeError(null)
+    setBuildError(null)
+    setDataSpaceDemoLoading(true)
+
+    try {
+      const demoSpace = 'segittur-mock'
+      const rid = restaurantId || dataProductsFilters.restaurantId || undefined
+
+      setPublishSpace(demoSpace)
+      setConsumePurpose('discovery')
+      stepLog('Data-space demo (menu): start', 'running')
+
+      const build = await runTimedStep('Build data product (menu)', async () => {
+        return buildDataProduct({
+          apiKey,
+          orgId: orgId || undefined,
+          type: 'menu',
+          restaurantId: rid,
+        })
+      })
+
+      const product = build.res
+      setSelectedDataProduct(product)
+      setLastResponse(product)
+
+      await runTimedStep('Refresh data products', async () => refreshDataProducts())
+
+      const publish = await runTimedStep(`Publish to ${demoSpace}`, async () => {
+        return publishProduct({
+          apiKey,
+          orgId: orgId || undefined,
+          space: demoSpace,
+          productId: product.id,
+        })
+      })
+
+      setLastResponse(publish.res)
+      setPublishedStatus((prev) => ({
+        ...prev,
+        [demoSpace]: {
+          ok: true,
+          ts: new Date().toISOString(),
+          result: publish.res,
+        },
+      }))
+
+      const allowConsume = await runTimedStep('Consume (discovery)', async () => {
+        return consumeProduct({
+          apiKey,
+          orgId: orgId || undefined,
+          space: demoSpace,
+          productId: product.id,
+          purpose: 'discovery',
+        })
+      })
+
+      setConsumeResult(allowConsume.res)
+      setLastResponse(allowConsume.res)
+
+      const denyConsume = await runTimedStep(
+        'Consume (ads-targeting)',
+        async () => {
+          return consumeProduct({
+            apiKey,
+            orgId: orgId || undefined,
+            space: demoSpace,
+            productId: product.id,
+            purpose: 'ads-targeting',
+          })
+        },
+        { allow403: true },
+      )
+
+      if (denyConsume.denied) {
+        setConsumeError(denyConsume.err)
+        setLastError(denyConsume.err)
+      }
+
+      setAuditFilters((prev) => ({
+        ...prev,
+        action: 'all',
+        space: demoSpace,
+        productId: product.id,
+      }))
+
+      await runTimedStep('Fetch audit logs', async () => onFetchAuditLogs())
+
+      stepLog('Data-space demo (menu): done', 'ok')
+    } catch (err) {
+      setLastError(err)
+      stepLog('Data-space demo (menu): aborted', 'error')
+    } finally {
+      setDataSpaceDemoLoading(false)
+    }
   }
 
   async function refreshDataProducts() {
@@ -718,15 +838,27 @@ export default function DataHubTab({ editorState }) {
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-slate-800">Data Products</div>
-          <button
-            type="button"
-            onClick={refreshDataProducts}
-            disabled={missingApiKey || dataProductsLoading}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${dataProductsLoading ? 'animate-spin' : ''}`} />
-            {dataProductsLoading ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={runDataSpaceDemoMenu}
+              disabled={missingApiKey || dataSpaceDemoLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-xs font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${dataSpaceDemoLoading ? 'animate-spin' : ''}`} />
+              {dataSpaceDemoLoading ? 'Running…' : 'Run data-space demo (menu)'}
+            </button>
+
+            <button
+              type="button"
+              onClick={refreshDataProducts}
+              disabled={missingApiKey || dataProductsLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${dataProductsLoading ? 'animate-spin' : ''}`} />
+              {dataProductsLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
