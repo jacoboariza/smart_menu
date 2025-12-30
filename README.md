@@ -17,6 +17,36 @@ export API_KEY=mykey
 npx netlify-cli dev
 ```
 
+## Frontend + Data Hub
+
+### Levantar UI + API en local
+
+En una terminal:
+
+```bash
+export API_KEY=mykey
+npm run dev:api
+```
+
+En otra terminal (para que el front apunte al API local):
+
+```bash
+export VITE_API_BASE_URL="http://localhost:8888/.netlify/functions/api"
+npm run dev
+```
+
+### Cómo usar la pestaña Data Hub
+
+- **API Key**: la misma que `API_KEY` en el entorno del backend (ej. `mykey`).
+- **OrgId**: opcional. Si lo pones, el backend aísla staging por organización.
+- **RestaurantId**: id lógico del restaurante para ingest/normalizados (por defecto `resto-1`).
+- **Currency**: moneda para el payload de menú (por defecto `EUR`).
+
+Acciones:
+
+- **Run demo (menu+occupancy+normalize)**: ejecuta ingest de menú (desde el editor), ingest de ocupación (demo) y normaliza.
+- **Ver staging / Ver normalizados**: inspección de solo lectura del almacenamiento (top 5 + conteo).
+
 ## Demo rápida
 ```bash
 export BASE_URL="http://localhost:8888/.netlify/functions/api"
@@ -70,6 +100,8 @@ docs/              # Runbook con curls completos
 | POST | `/publish/:space` | Publica data product |
 | POST | `/consume/:space/:productId` | Consume con policy check |
 | GET | `/audit/logs` | Lista auditoría |
+| GET | `/debug/staging?source=menu\|occupancy` | Debug: staging (solo lectura) |
+| GET | `/debug/normalized?type=menu\|occupancy&restaurantId=...` | Debug: normalizados (solo lectura) |
 
 ## Policy por defecto
 - **allowedPurposes**: discovery, recommendation, analytics
