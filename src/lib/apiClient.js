@@ -79,8 +79,8 @@ function buildHeaders({ apiKey, orgId } = {}) {
   return headers
 }
 
-export function health() {
-  return request('/audit/logs', { method: 'GET' })
+export function health({ apiKey, orgId } = {}) {
+  return request('/audit/logs', { method: 'GET', headers: buildHeaders({ apiKey, orgId }) })
 }
 
 export function ingestMenu(payload, { apiKey, orgId } = {}) {

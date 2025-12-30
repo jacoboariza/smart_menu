@@ -27,6 +27,7 @@ import {
   Zap,
   Cookie,
   Droplets,
+  Database,
 } from 'lucide-react'
 import { useRef } from 'react'
 
@@ -34,6 +35,7 @@ import InicioTab from './tabs/InicioTab.jsx'
 import EditorTab from './tabs/EditorTab.jsx'
 import JsonTab from './tabs/JsonTab.jsx'
 import PreviewTab from './tabs/PreviewTab.jsx'
+import DataHubTab from './tabs/DataHubTab.jsx'
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -992,6 +994,19 @@ ${jsonLdString}
             <Code className="h-4 w-4" />
             Datos Web 3.0
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('datahub')}
+            className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+              activeTab === 'datahub'
+                ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            Data Hub
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-200 absolute bottom-0 left-0 right-0">
@@ -1087,6 +1102,8 @@ ${jsonLdString}
             totalItems={totalItems}
           />
         )}
+
+        {activeTab === 'datahub' && <DataHubTab sections={sections} />}
       </main>
 
       {showPdfModal && (
