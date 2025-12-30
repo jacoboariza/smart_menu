@@ -29,9 +29,13 @@ netlify dev
 | POST | `/ingest/menu` | Ingesta menú |
 | POST | `/ingest/occupancy` | Ingesta ocupación |
 | POST | `/normalize/run` | Normaliza staging a canónicos |
+| GET | `/data-products` | Lista data products (query: `type`, `restaurantId`) |
+| POST | `/data-products/build` | Construye data product desde normalizados |
 | POST | `/publish/:space` | Publica data product a space |
 | POST | `/consume/:space/:productId` | Consume data product |
 | GET | `/audit/logs` | Lista eventos de auditoría |
+| GET | `/debug/staging` | Debug staging (query: `source`, `orgId`) |
+| GET | `/debug/normalized` | Debug normalizados (query: `type`, `restaurantId`) |
 
 ---
 
@@ -146,6 +150,11 @@ curl -X POST \
 ```
 Respuesta: `403 { "error": { "code": "access_denied", "message": "purpose 'marketing' not allowed" } }`
 
+### Ejemplos de purpose
+
+- Permitidos por defecto: `discovery`, `recommendation`, `analytics`
+- No permitido (para probar deny): `ads-targeting` (o cualquier otro fuera de la lista)
+
 ## 8. Audit Logs
 ```bash
 # Todos los logs
@@ -198,6 +207,31 @@ Respuesta: `200 { "logs": [...] }`
 ## Spaces disponibles
 - `segittur` — Mock adapter SEGITTUR
 - `gaiax` — Mock adapter GAIA-X
+
+## Troubleshooting
+
+### 401 unauthorized
+
+- **Síntoma**: respuestas 401.
+- **Causa típica**: `X-API-Key` no coincide con `API_KEY`.
+- **Solución**: revisa el valor de `API_KEY` en el entorno donde corre `netlify dev` y el input de API Key en el Data Hub.
+
+### 403 access_denied (policy)
+
+- **Síntoma**: `403` al consumir.
+- **Causa típica**: `purpose` no permitido por policy o roles insuficientes.
+- **Solución**: prueba con `purpose=discovery` y/o añade roles con `X-Roles` (ej. `destination`).
+
+### 404 not_found
+
+- **Síntoma**: `product_not_found` al publish/consume.
+- **Causa típica**: `productId` incorrecto, o no se ha construido el data product.
+- **Solución**: construye el producto (Data Hub → Build) y/o lista data products para copiar un `id` válido.
+
+### Netlify Dev
+
+- El API se sirve en: `http://localhost:8888/.netlify/functions/api`
+- Si el front no apunta al API local, configura `VITE_API_BASE_URL` (ver README).
 
 ## Notas
 - Los conectores registrados se resuelven por `source` (`menu`, `occupancy`).
