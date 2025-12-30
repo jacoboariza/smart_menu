@@ -2,6 +2,7 @@ import { Activity, Database, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide
 import { useState } from 'react'
 
 import {
+  listDataProducts,
   debugNormalized,
   debugStaging,
   health,
@@ -18,6 +19,15 @@ export default function DataHubTab({ editorState }) {
   const [orgId, setOrgId] = useState('')
   const [restaurantId, setRestaurantId] = useState('resto-1')
   const [currency, setCurrency] = useState('EUR')
+
+  const [dataProducts, setDataProducts] = useState([])
+  const [selectedDataProduct, setSelectedDataProduct] = useState(null)
+  const [dataProductsFilters, setDataProductsFilters] = useState({
+    type: 'all',
+    restaurantId: 'resto-1',
+  })
+  const [dataProductsLoading, setDataProductsLoading] = useState(false)
+  const [dataProductsError, setDataProductsError] = useState(null)
 
   const [loading, setLoading] = useState({
     health: false,
@@ -91,6 +101,30 @@ export default function DataHubTab({ editorState }) {
   function stepLog(label, status) {
     const suffix = status === 'ok' ? ' ✅' : status === 'error' ? ' ❌' : ''
     pushLog({ ts: new Date().toISOString(), action: `${label}${suffix}`, status })
+  }
+
+  async function refreshDataProducts() {
+    setDataProductsError(null)
+    setDataProductsLoading(true)
+    try {
+      const type = dataProductsFilters.type === 'all' ? undefined : dataProductsFilters.type
+      const res = await listDataProducts({
+        apiKey,
+        orgId: orgId || undefined,
+        type,
+        restaurantId: dataProductsFilters.restaurantId || undefined,
+      })
+      const products = Array.isArray(res?.products) ? res.products : Array.isArray(res) ? res : []
+      setDataProducts(products)
+      setLastResponse(res)
+      stepLog('List data products', 'ok')
+    } catch (err) {
+      setDataProductsError(err)
+      setLastError(err)
+      stepLog('List data products', 'error')
+    } finally {
+      setDataProductsLoading(false)
+    }
   }
 
   async function runAction(label, key, fn) {
@@ -468,6 +502,111 @@ export default function DataHubTab({ editorState }) {
         ) : (
           <div className="text-sm text-slate-500">—</div>
         )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm font-semibold text-slate-800">Data Products</div>
+          <button
+            type="button"
+            onClick={refreshDataProducts}
+            disabled={missingApiKey || dataProductsLoading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${dataProductsLoading ? 'animate-spin' : ''}`} />
+            {dataProductsLoading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">type</label>
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={dataProductsFilters.type}
+              onChange={(e) =>
+                setDataProductsFilters((prev) => ({
+                  ...prev,
+                  type: e.target.value,
+                }))
+              }
+            >
+              <option value="all">all</option>
+              <option value="menu">menu</option>
+              <option value="occupancy">occupancy</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">restaurantId</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={dataProductsFilters.restaurantId}
+              onChange={(e) =>
+                setDataProductsFilters((prev) => ({
+                  ...prev,
+                  restaurantId: e.target.value,
+                }))
+              }
+              placeholder="resto-1"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+
+        {dataProductsError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {toUserError(dataProductsError)}
+          </div>
+        )}
+
+        <div className="mt-4 overflow-auto">
+          {dataProducts.length ? (
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                  <th className="py-2 pr-3 font-medium">id</th>
+                  <th className="py-2 pr-3 font-medium">type</th>
+                  <th className="py-2 pr-3 font-medium">version</th>
+                  <th className="py-2 pr-3 font-medium">title</th>
+                  <th className="py-2 pr-3 font-medium">restaurantId</th>
+                  <th className="py-2 pr-3 font-medium">createdAt</th>
+                  <th className="py-2 pr-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataProducts.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-100">
+                    <td className="py-2 pr-3 font-mono text-xs text-slate-700">{p.id}</td>
+                    <td className="py-2 pr-3 text-slate-700">{p.type}</td>
+                    <td className="py-2 pr-3 text-slate-700">{p.version}</td>
+                    <td className="py-2 pr-3 text-slate-700">{p?.metadata?.title}</td>
+                    <td className="py-2 pr-3 text-slate-700">{p?.metadata?.restaurantId}</td>
+                    <td className="py-2 pr-3 text-slate-700">{p.createdAt}</td>
+                    <td className="py-2 pr-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDataProduct(p)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Select
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-sm text-slate-500">—</div>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <div className="text-xs font-semibold text-slate-700 mb-2">selectedDataProduct</div>
+          <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-64">
+            {selectedDataProduct ? JSON.stringify(selectedDataProduct, null, 2) : '—'}
+          </pre>
+        </div>
       </section>
     </div>
   )
