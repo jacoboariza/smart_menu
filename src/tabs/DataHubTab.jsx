@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   buildDataProduct,
   listDataProducts,
+  consumeProduct,
   publishProduct,
   debugNormalized,
   debugStaging,
@@ -41,6 +42,11 @@ export default function DataHubTab({ editorState }) {
   const [publishError, setPublishError] = useState(null)
   const [publishedStatus, setPublishedStatus] = useState({})
 
+  const [consumePurpose, setConsumePurpose] = useState('discovery')
+  const [consumeLoading, setConsumeLoading] = useState(false)
+  const [consumeError, setConsumeError] = useState(null)
+  const [consumeResult, setConsumeResult] = useState(null)
+
   const [loading, setLoading] = useState({
     health: false,
     ingestMenu: false,
@@ -59,6 +65,42 @@ export default function DataHubTab({ editorState }) {
 
   function pushLog(entry) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
+  }
+
+  async function onConsumeSelectedProduct() {
+    setConsumeError(null)
+    setLastError(null)
+    setConsumeResult(null)
+    setConsumeLoading(true)
+
+    const productId = selectedDataProduct?.id
+    if (!productId) {
+      const err = { code: 'missing_product_id', message: 'No hay data product seleccionado' }
+      setConsumeError(err)
+      setLastError(err)
+      setConsumeLoading(false)
+      return
+    }
+
+    try {
+      const res = await consumeProduct({
+        apiKey,
+        orgId: orgId || undefined,
+        space: publishSpace,
+        productId,
+        purpose: consumePurpose,
+      })
+
+      setConsumeResult(res)
+      setLastResponse(res)
+      stepLog(`CONSUME (${publishSpace})`, 'ok')
+    } catch (err) {
+      setConsumeError(err)
+      setLastError(err)
+      stepLog(`CONSUME (${publishSpace})`, 'error')
+    } finally {
+      setConsumeLoading(false)
+    }
   }
 
   async function viewStaging(source) {
@@ -842,6 +884,79 @@ export default function DataHubTab({ editorState }) {
               {toUserError(publishError)}
             </div>
           )}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-slate-800">Consume</div>
+            <button
+              type="button"
+              onClick={onConsumeSelectedProduct}
+              disabled={missingApiKey || consumeLoading || !selectedDataProduct?.id}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-xs font-medium text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${consumeLoading ? 'animate-spin' : ''}`} />
+              {consumeLoading ? 'Consuming…' : 'Consume selected'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">space</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                value={publishSpace}
+                onChange={(e) => setPublishSpace(e.target.value)}
+              >
+                <option value="segittur-mock">segittur-mock</option>
+                <option value="gaiax-mock">gaiax-mock</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-slate-600">purpose</label>
+                <select
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                  value={consumePurpose}
+                  onChange={(e) => setConsumePurpose(e.target.value)}
+                  title="Template selector"
+                >
+                  <option value="discovery">discovery</option>
+                  <option value="recommendation">recommendation</option>
+                  <option value="analytics">analytics</option>
+                  <option value="ads-targeting">ads-targeting</option>
+                </select>
+              </div>
+              <input
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                value={consumePurpose}
+                onChange={(e) => setConsumePurpose(e.target.value)}
+                placeholder="discovery"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          {consumeError?.status === 403 ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="text-sm font-semibold text-amber-800">DENIED</div>
+              <div className="mt-1 text-sm text-amber-800">
+                {consumeError?.message || consumeError?.details?.message || 'Acceso denegado'}
+              </div>
+            </div>
+          ) : consumeError ? (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {toUserError(consumeError)}
+            </div>
+          ) : null}
+
+          <div className="mt-4">
+            <div className="text-xs font-semibold text-slate-700 mb-2">result</div>
+            <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-64">
+              {consumeResult ? JSON.stringify(consumeResult, null, 2) : '—'}
+            </pre>
+          </div>
         </div>
       </section>
     </div>
