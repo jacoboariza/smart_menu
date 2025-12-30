@@ -30,6 +30,11 @@ import {
 } from 'lucide-react'
 import { useRef } from 'react'
 
+import InicioTab from './tabs/InicioTab.jsx'
+import EditorTab from './tabs/EditorTab.jsx'
+import JsonTab from './tabs/JsonTab.jsx'
+import PreviewTab from './tabs/PreviewTab.jsx'
+
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
@@ -1012,803 +1017,75 @@ ${jsonLdString}
       </div>
 
       <main className="ml-64 p-6 min-h-screen">
-        {activeTab === 'inicio' && (
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 text-sm font-medium mb-6">
-                <Sparkles className="h-4 w-4" />
-                Web Semántica para Restaurantes
-              </div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-4">
-                Haz tu menú <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">inteligente</span>
-              </h1>
-              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Genera datos estructurados JSON-LD que Google, Siri y Alexa pueden entender. Mejora tu SEO y visibilidad sin tocar código.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              <div className="group relative bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-lg hover:border-indigo-200 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Utensils className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-xs font-bold text-indigo-600 mb-2">PASO 1</div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">Crea tu carta</h3>
-                <p className="text-sm text-slate-600">Añade secciones y platos con precios, descripciones y etiquetas dietéticas.</p>
-              </div>
-
-              <div className="group relative bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-lg hover:border-indigo-200 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-xs font-bold text-emerald-600 mb-2">PASO 2</div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">Generación automática</h3>
-                <p className="text-sm text-slate-600">El JSON-LD se genera en tiempo real siguiendo el estándar Schema.org.</p>
-              </div>
-
-              <div className="group relative bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-lg hover:border-indigo-200 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Globe className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-xs font-bold text-amber-600 mb-2">PASO 3</div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">Publica en tu web</h3>
-                <p className="text-sm text-slate-600">Copia el código y pégalo en el &lt;head&gt; de tu página. ¡Listo!</p>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 text-white mb-8">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                  <Lightbulb className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">¿Por qué datos estructurados?</h3>
-                  <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                    Los datos estructurados permiten que los motores de búsqueda entiendan mejor tu contenido. Google puede mostrar tu menú directamente en los resultados de búsqueda con <strong className="text-white">rich snippets</strong>, aumentando tu visibilidad y clics.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-medium">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> SEO mejorado
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-medium">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Compatible con asistentes de voz
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-medium">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Estándar W3C
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setActiveTab('editor')}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
-              >
-                Comenzar ahora
-                <ArrowRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        )}
+        {activeTab === 'inicio' && <InicioTab onStart={() => setActiveTab('editor')} />}
 
         {activeTab === 'editor' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Editor de Carta</h2>
-                <p className="text-sm text-slate-500">Crea y edita tu menú. Los cambios se reflejan en tiempo real.</p>
-              </div>
-            </div>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-4">
-                <Utensils className="h-4 w-4 text-indigo-600" />
-                Información del Restaurante
-              </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={restaurantName}
-                    onChange={(e) => setRestaurantName(e.target.value)}
-                    placeholder="Nombre del Restaurante"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de Cocina</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={restaurantCuisine}
-                    onChange={(e) => setRestaurantCuisine(e.target.value)}
-                    placeholder="Ej: Mediterránea, Italiana, Japonesa..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    <Phone className="h-3 w-3 inline mr-1" />Teléfono
-                  </label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={restaurantPhone}
-                    onChange={(e) => setRestaurantPhone(e.target.value)}
-                    placeholder="+34 912 345 678"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    <Globe className="h-3 w-3 inline mr-1" />URL Web
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                      value={restaurantUrl}
-                      onChange={(e) => setRestaurantUrl(e.target.value)}
-                      placeholder="https://www.mirestaurante.com"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAutofillFromWebsite}
-                      disabled={webAutofillLoading || !normalizeWebsiteUrl(restaurantUrl)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                      title="Intentar completar datos desde la web (JSON-LD / meta tags)"
-                    >
-                      {webAutofillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                      Extraer
-                    </button>
-                  </div>
-                  {webAutofillError && (
-                    <div className="mt-2 text-xs text-red-600">{webAutofillError}</div>
-                  )}
-                  {!webAutofillError && (
-                    <div className="mt-2 text-[11px] text-slate-500">
-                      Se intentará leer datos públicos (JSON-LD / meta). No se almacena la información.
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Licencia de los datos</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={restaurantLicense}
-                    onChange={(e) => setRestaurantLicense(e.target.value)}
-                    placeholder="https://creativecommons.org/licenses/by/4.0/"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">Incluye la URL de la licencia (ej. CC BY 4.0).</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Ámbito de compartición</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={dataSharingScope}
-                    onChange={(e) => setDataSharingScope(e.target.value)}
-                  >
-                    <option value="public">Público</option>
-                    <option value="partners">Partners</option>
-                    <option value="private">Privado</option>
-                  </select>
-                  <p className="text-[11px] text-slate-500 mt-1">Controla la difusión del menú en espacios de datos.</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    <Image className="h-3 w-3 inline mr-1" />URL Imagen de Portada
-                  </label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={restaurantImage}
-                    onChange={(e) => setRestaurantImage(e.target.value)}
-                    placeholder="https://ejemplo.com/imagen-restaurante.jpg"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 mb-3">
-                  <MapPin className="h-3.5 w-3.5 text-indigo-600" />
-                  Dirección
-                </div>
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Calle</label>
-                    <input
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                      value={restaurantStreet}
-                      onChange={(e) => setRestaurantStreet(e.target.value)}
-                      placeholder="Calle Principal, 123"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Ciudad</label>
-                    <input
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                      value={restaurantCity}
-                      onChange={(e) => setRestaurantCity(e.target.value)}
-                      placeholder="Madrid"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">CP</label>
-                      <input
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                        value={restaurantPostalCode}
-                        onChange={(e) => setRestaurantPostalCode(e.target.value)}
-                        placeholder="28001"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">País</label>
-                      <input
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                        value={restaurantCountry}
-                        onChange={(e) => setRestaurantCountry(e.target.value)}
-                        placeholder="ES"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">Secciones</div>
-                  <div className="text-xs text-slate-500">Crea categorías como Entrantes, Principales, Postres…</div>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    className="w-full sm:w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                    value={newSectionName}
-                    onChange={(e) => setNewSectionName(e.target.value)}
-                    placeholder="Nueva sección"
-                  />
-                  <button
-                    type="button"
-                    onClick={addSection}
-                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Añadir
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <div className="space-y-4">
-              {sections.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-                  Crea tu primera sección para empezar.
-                </div>
-              )}
-
-              {sections.map((section) => (
-                <section key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <input
-                      className="w-full sm:w-[420px] text-lg font-semibold text-slate-900 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
-                      value={section.name}
-                      onChange={(e) => renameSection(section.id, e.target.value)}
-                      placeholder="Nombre de sección"
-                    />
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => addItem(section.id)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Añadir plato
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteSection(section.id)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                        Eliminar sección
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {section.items.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-500">
-                        Sin platos todavía.
-                      </div>
-                    )}
-
-                    {section.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`rounded-xl border border-slate-200 p-4 transition-opacity ${
-                          item.isAvailable ? 'bg-white' : 'bg-slate-50 opacity-70'
-                        }`}
-                      >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="flex-1">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                              <input
-                                className="w-full sm:flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200"
-                                value={item.name}
-                                onChange={(e) => updateItem(section.id, item.id, { name: e.target.value })}
-                                placeholder="Nombre del plato"
-                              />
-
-                              <div className="flex items-center gap-2">
-                                <select
-                                  className="rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.currency || 'EUR'}
-                                  onChange={(e) => updateItem(section.id, item.id, { currency: e.target.value })}
-                                >
-                                  {CURRENCIES.map((c) => (
-                                    <option key={c.code} value={c.code}>
-                                      {c.code}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.price}
-                                  onChange={(e) =>
-                                    updateItem(section.id, item.id, {
-                                      price: Number(e.target.value || 0),
-                                    })
-                                  }
-                                />
-                                <span className="text-sm text-slate-600">
-                                  {CURRENCIES.find((c) => c.code === (item.currency || 'EUR'))?.symbol || '€'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <textarea
-                              rows={2}
-                              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                              value={item.description}
-                              onChange={(e) => updateItem(section.id, item.id, { description: e.target.value })}
-                              placeholder="Descripción detallada"
-                            />
-
-                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                              <div className="flex items-center gap-2">
-                                <Image className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                                <input
-                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.image || ''}
-                                  onChange={(e) => updateItem(section.id, item.id, { image: e.target.value })}
-                                  placeholder="URL imagen del plato"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Video className="h-4 w-4 text-indigo-500 flex-shrink-0" />
-                                <input
-                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.video || ''}
-                                  onChange={(e) => updateItem(section.id, item.id, { video: e.target.value })}
-                                  placeholder="URL video corto (mp4/webm/Reel)"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                              <div className="flex items-center gap-2">
-                                <Salad className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                <input
-                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-200"
-                                  value={item.ingredients || ''}
-                                  onChange={(e) => updateItem(section.id, item.id, { ingredients: e.target.value })}
-                                  placeholder="Ingredientes separados por comas"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  <Zap className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                  <input
-                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
-                                    value={item.calories || ''}
-                                    onChange={(e) => updateItem(section.id, item.id, { calories: e.target.value })}
-                                    placeholder="kcal"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Dumbbell className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                  <input
-                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
-                                    value={item.protein || ''}
-                                    onChange={(e) => updateItem(section.id, item.id, { protein: e.target.value })}
-                                    placeholder="prot g"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Cookie className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                                  <input
-                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
-                                    value={item.carbs || ''}
-                                    onChange={(e) => updateItem(section.id, item.id, { carbs: e.target.value })}
-                                    placeholder="carbs g"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Droplets className="h-4 w-4 text-pink-500 flex-shrink-0" />
-                                  <input
-                                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
-                                    value={item.fat || ''}
-                                    onChange={(e) => updateItem(section.id, item.id, { fat: e.target.value })}
-                                    placeholder="grasa g"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-                              <label className="inline-flex items-center gap-2 text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
-                                  checked={item.isVegan}
-                                  onChange={(e) => updateItem(section.id, item.id, { isVegan: e.target.checked })}
-                                />
-                                <span className="inline-flex items-center gap-1">
-                                  <Leaf className="h-4 w-4 text-emerald-600" />
-                                  Vegano
-                                </span>
-                              </label>
-
-                              <label className="inline-flex items-center gap-2 text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-200"
-                                  checked={item.isVegetarian}
-                                  onChange={(e) =>
-                                    updateItem(section.id, item.id, { isVegetarian: e.target.checked })
-                                  }
-                                />
-                                Vegetariano
-                              </label>
-
-                              <label className="inline-flex items-center gap-2 text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-200"
-                                  checked={item.isGlutenFree}
-                                  onChange={(e) =>
-                                    updateItem(section.id, item.id, { isGlutenFree: e.target.checked })
-                                  }
-                                />
-                                Sin Gluten
-                              </label>
-
-                              <label className="inline-flex items-center gap-2 text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200"
-                                  checked={item.isAvailable}
-                                  onChange={(e) =>
-                                    updateItem(section.id, item.id, { isAvailable: e.target.checked })
-                                  }
-                                />
-                                Disponible
-                              </label>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={() => deleteItem(section.id, item.id)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                            >
-                              <X className="h-4 w-4" />
-                              Eliminar plato
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </div>
+          <EditorTab
+            restaurantName={restaurantName}
+            setRestaurantName={setRestaurantName}
+            restaurantCuisine={restaurantCuisine}
+            setRestaurantCuisine={setRestaurantCuisine}
+            restaurantPhone={restaurantPhone}
+            setRestaurantPhone={setRestaurantPhone}
+            restaurantUrl={restaurantUrl}
+            setRestaurantUrl={setRestaurantUrl}
+            handleAutofillFromWebsite={handleAutofillFromWebsite}
+            webAutofillLoading={webAutofillLoading}
+            webAutofillError={webAutofillError}
+            normalizeWebsiteUrl={normalizeWebsiteUrl}
+            restaurantLicense={restaurantLicense}
+            setRestaurantLicense={setRestaurantLicense}
+            dataSharingScope={dataSharingScope}
+            setDataSharingScope={setDataSharingScope}
+            restaurantImage={restaurantImage}
+            setRestaurantImage={setRestaurantImage}
+            restaurantStreet={restaurantStreet}
+            setRestaurantStreet={setRestaurantStreet}
+            restaurantCity={restaurantCity}
+            setRestaurantCity={setRestaurantCity}
+            restaurantPostalCode={restaurantPostalCode}
+            setRestaurantPostalCode={setRestaurantPostalCode}
+            restaurantCountry={restaurantCountry}
+            setRestaurantCountry={setRestaurantCountry}
+            newSectionName={newSectionName}
+            setNewSectionName={setNewSectionName}
+            addSection={addSection}
+            sections={sections}
+            renameSection={renameSection}
+            addItem={addItem}
+            deleteSection={deleteSection}
+            updateItem={updateItem}
+            deleteItem={deleteItem}
+            currencies={CURRENCIES}
+          />
         )}
 
         {activeTab === 'preview' && (
-          <div className="flex justify-center">
-            <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-lg overflow-hidden">
-              {restaurantImage && (
-                <div className="h-40 bg-gradient-to-br from-slate-200 to-slate-300 overflow-hidden relative">
-                  <img 
-                    src={restaurantImage} 
-                    alt={restaurantName}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              )}
-              
-              <div className={`bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-4 text-white ${restaurantImage ? '' : 'pt-6'}`}>
-                <div className="text-xl font-bold">{restaurantName || 'Mi Restaurante'}</div>
-                {restaurantCuisine && (
-                  <div className="text-sm text-indigo-100 mt-0.5">{restaurantCuisine}</div>
-                )}
-                
-                <div className="mt-3 flex flex-wrap gap-3 text-xs">
-                  {restaurantPhone && (
-                    <a href={`tel:${restaurantPhone}`} className="inline-flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1 hover:bg-white/30 transition-colors">
-                      <Phone className="h-3 w-3" />
-                      {restaurantPhone}
-                    </a>
-                  )}
-                  {restaurantUrl && (
-                    <a href={restaurantUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1 hover:bg-white/30 transition-colors">
-                      <Globe className="h-3 w-3" />
-                      Web
-                    </a>
-                  )}
-                </div>
-                
-                {(restaurantStreet || restaurantCity) && (
-                  <div className="mt-3 flex items-start gap-1.5 text-xs text-indigo-100">
-                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                    <span>
-                      {[restaurantStreet, restaurantCity, restaurantPostalCode, restaurantCountry].filter(Boolean).join(', ')}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="px-4 py-5">
-                {sections.length === 0 ? (
-                  <div className="text-center text-sm text-slate-500 py-10">No hay secciones todavía.</div>
-                ) : (
-                  <div className="space-y-6">
-                    {sections.map((section) => (
-                      <div key={section.id}>
-                        <div className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">{section.name}</div>
-                        <div className="mt-3 space-y-4">
-                          {section.items.length === 0 ? (
-                            <div className="text-xs text-slate-400">Sin platos.</div>
-                          ) : (
-                            section.items.map((item) => (
-                              <div
-                                key={item.id}
-                                className={`rounded-xl border border-slate-200 overflow-hidden ${
-                                  item.isAvailable ? 'bg-white' : 'bg-slate-50'
-                                }`}
-                              >
-                                {item.image && (
-                                  <div className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-                                    <img 
-                                      src={item.image} 
-                                      alt={item.name}
-                                      className="w-full h-full object-cover"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  </div>
-                                )}
-                                <div className="p-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className={`flex-1 ${item.isAvailable ? '' : 'opacity-70'}`}>
-                                      <div className="text-sm font-semibold text-slate-900">{item.name}</div>
-                                      <div className="mt-1 text-xs text-slate-600">{item.description}</div>
-
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {item.calories && (
-                                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-800">
-                                            <Zap className="h-3 w-3" /> {item.calories} kcal
-                                          </span>
-                                        )}
-                                        {item.isVegan && (
-                                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                                            <Leaf className="h-3 w-3" /> Vegano
-                                          </span>
-                                        )}
-                                        {item.isGlutenFree && (
-                                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                                            Sin Gluten
-                                          </span>
-                                        )}
-                                        {!item.isAvailable && (
-                                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
-                                            No disponible
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div className={`text-base font-bold text-indigo-600 ${item.isAvailable ? '' : 'opacity-70'}`}>
-                                      {Number(item.price || 0).toFixed(2)}{' '}
-                                      {CURRENCIES.find((c) => c.code === (item.currency || 'EUR'))?.symbol || '€'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-center">
-                <div className="text-[10px] text-slate-400">Carta digital con datos semánticos</div>
-              </div>
-            </div>
-          </div>
+          <PreviewTab
+            restaurantName={restaurantName}
+            restaurantImage={restaurantImage}
+            restaurantCuisine={restaurantCuisine}
+            restaurantPhone={restaurantPhone}
+            restaurantUrl={restaurantUrl}
+            restaurantStreet={restaurantStreet}
+            restaurantCity={restaurantCity}
+            restaurantPostalCode={restaurantPostalCode}
+            restaurantCountry={restaurantCountry}
+            sections={sections}
+            currencies={CURRENCIES}
+          />
         )}
 
         {activeTab === 'json' && (
-          <div className="space-y-6 max-w-5xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Datos Web 3.0</h2>
-                <p className="text-sm text-slate-500">Código JSON-LD listo para usar en tu web</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Sincronizado W3C
-                </span>
-              </div>
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">JSON-LD generado</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={copyToClipboard}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        copied 
-                          ? 'bg-emerald-100 text-emerald-700' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied ? 'Copiado' : 'Copiar'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={downloadJson}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Descargar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={downloadTurtle}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Descargar TTL
-                    </button>
-                  </div>
-                </div>
-                <pre className="overflow-auto p-4 text-xs text-slate-100 bg-slate-900 max-h-[400px]">
-                  <code>{jsonLdString}</code>
-                </pre>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl border border-indigo-100 p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-amber-500" />
-                    Cómo usar este código
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">Copia el código</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Haz clic en "Copiar" o descarga el archivo JSON.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">Abre tu archivo HTML</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Localiza la etiqueta <code className="px-1 py-0.5 bg-white rounded text-indigo-600">&lt;head&gt;</code> de tu página web.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">Pega el script</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Inserta el código dentro de <code className="px-1 py-0.5 bg-white rounded text-indigo-600">&lt;script type="application/ld+json"&gt;</code></p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        <CheckCircle2 className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">¡Listo!</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Google indexará tu menú automáticamente.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-3">Ejemplo de integración</h4>
-                  <pre className="overflow-auto p-3 rounded-lg bg-slate-800 text-xs text-slate-200">
-                    <code>{`<!DOCTYPE html>
-<html>
-<head>
-  <title>Mi Restaurante</title>
-  
-  <!-- Pega aquí el JSON-LD -->
-  <script type="application/ld+json">
-    { ... tu JSON-LD ... }
-  </script>
-  
-</head>
-<body>...</body>
-</html>`}</code>
-                  </pre>
-                </div>
-
-                <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
-                  <div className="flex gap-3">
-                    <Lightbulb className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-amber-900">Consejo Pro</p>
-                      <p className="text-xs text-amber-800 mt-1">
-                        Usa la herramienta <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer" className="underline font-medium">Rich Results Test</a> de Google para validar que tu código es correcto.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                  <Code className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-slate-900">{sections.length}</div>
-                  <div className="text-xs text-slate-500">Secciones</div>
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <Utensils className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-slate-900">{totalItems}</div>
-                  <div className="text-xs text-slate-500">Platos totales</div>
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
-                  <Globe className="h-5 w-5 text-violet-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-slate-900">{jsonLdString.length}</div>
-                  <div className="text-xs text-slate-500">Caracteres JSON</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <JsonTab
+            copied={copied}
+            copyToClipboard={copyToClipboard}
+            downloadJson={downloadJson}
+            downloadTurtle={downloadTurtle}
+            jsonLdString={jsonLdString}
+            sections={sections}
+            totalItems={totalItems}
+          />
         )}
       </main>
 
