@@ -1,11 +1,12 @@
 import { Activity, Database, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   buildDataProduct,
   listDataProducts,
   consumeProduct,
   publishProduct,
+  listAuditLogs,
   debugNormalized,
   debugStaging,
   health,
@@ -47,6 +48,24 @@ export default function DataHubTab({ editorState }) {
   const [consumeError, setConsumeError] = useState(null)
   const [consumeResult, setConsumeResult] = useState(null)
 
+  const [auditFilters, setAuditFilters] = useState({
+    action: 'all',
+    space: 'all',
+    productId: '',
+    since: '',
+  })
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState(null)
+  const [auditLogs, setAuditLogs] = useState([])
+
+  useEffect(() => {
+    if (!selectedDataProduct?.id) return
+    setAuditFilters((prev) => {
+      if (String(prev.productId || '').trim()) return prev
+      return { ...prev, productId: selectedDataProduct.id }
+    })
+  }, [selectedDataProduct?.id])
+
   const [loading, setLoading] = useState({
     health: false,
     ingestMenu: false,
@@ -65,6 +84,47 @@ export default function DataHubTab({ editorState }) {
 
   function pushLog(entry) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
+  }
+
+  function onAuditAutofillFromSelected() {
+    setAuditFilters((prev) => ({
+      ...prev,
+      productId: selectedDataProduct?.id || prev.productId,
+      space: publishSpace || prev.space,
+    }))
+  }
+
+  async function onFetchAuditLogs() {
+    setAuditError(null)
+    setLastError(null)
+    setAuditLoading(true)
+
+    try {
+      const action = auditFilters.action === 'all' ? undefined : auditFilters.action
+      const space = auditFilters.space === 'all' ? undefined : auditFilters.space
+      const productId = String(auditFilters.productId || '').trim() || undefined
+      const since = auditFilters.since ? new Date(auditFilters.since).toISOString() : undefined
+
+      const res = await listAuditLogs({
+        apiKey,
+        orgId: orgId || undefined,
+        action,
+        space,
+        productId,
+        since,
+      })
+
+      const logs = Array.isArray(res?.logs) ? res.logs : Array.isArray(res) ? res : []
+      setAuditLogs(logs)
+      setLastResponse(res)
+      stepLog('Audit logs', 'ok')
+    } catch (err) {
+      setAuditError(err)
+      setLastError(err)
+      stepLog('Audit logs', 'error')
+    } finally {
+      setAuditLoading(false)
+    }
   }
 
   async function onConsumeSelectedProduct() {
@@ -957,6 +1017,139 @@ export default function DataHubTab({ editorState }) {
               {consumeResult ? JSON.stringify(consumeResult, null, 2) : '—'}
             </pre>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm font-semibold text-slate-800">Audit Logs</div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onAuditAutofillFromSelected}
+              disabled={!selectedDataProduct?.id}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Auto-fill from selected
+            </button>
+
+            <button
+              type="button"
+              onClick={onFetchAuditLogs}
+              disabled={missingApiKey || auditLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${auditLoading ? 'animate-spin' : ''}`} />
+              {auditLoading ? 'Fetching…' : 'Fetch logs'}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">action</label>
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={auditFilters.action}
+              onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
+            >
+              <option value="all">all</option>
+              <option value="PUBLISH">PUBLISH</option>
+              <option value="CONSUME">CONSUME</option>
+              <option value="INGEST">INGEST</option>
+              <option value="NORMALIZE">NORMALIZE</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">space</label>
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={auditFilters.space}
+              onChange={(e) => setAuditFilters((prev) => ({ ...prev, space: e.target.value }))}
+            >
+              <option value="all">all</option>
+              <option value="segittur-mock">segittur-mock</option>
+              <option value="gaiax-mock">gaiax-mock</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">productId</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={auditFilters.productId}
+              onChange={(e) => setAuditFilters((prev) => ({ ...prev, productId: e.target.value }))}
+              placeholder={selectedDataProduct?.id ? selectedDataProduct.id : 'product-id'}
+              autoComplete="off"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">since</label>
+            <input
+              type="datetime-local"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              value={auditFilters.since}
+              onChange={(e) => setAuditFilters((prev) => ({ ...prev, since: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        {auditError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {toUserError(auditError)}
+          </div>
+        )}
+
+        <div className="mt-4">
+          {auditLogs.length ? (
+            <div className="space-y-2">
+              {auditLogs.map((l, idx) => {
+                const ts = l.ts || l.at || l.createdAt || ''
+                const actorOrg = l.actorOrg || l.actorOrgId || l.orgId || ''
+                const action = l.action || ''
+                const space = l.space || ''
+                const decision = (l.decision || l.result || l.outcome || '').toString().toLowerCase()
+                const reason = l.reason || l.message || l.details?.reason || l.details?.message || ''
+                const isDenied = decision === 'deny' || decision === 'denied' || l.status === 403
+
+                return (
+                  <div
+                    key={`${ts}-${idx}`}
+                    className={`rounded-lg border px-3 py-2 ${
+                      isDenied ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-xs text-slate-700">
+                        <span className="font-mono text-slate-500">{ts}</span>
+                        {actorOrg ? <span className="text-slate-500"> — {actorOrg}</span> : null}
+                      </div>
+                      {decision ? (
+                        <div
+                          className={`text-xs font-semibold ${
+                            isDenied ? 'text-amber-800' : 'text-emerald-700'
+                          }`}
+                        >
+                          {isDenied ? 'DENY' : decision.toUpperCase()}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-1 text-sm text-slate-800">
+                      <span className="font-semibold">{action || '—'}</span>
+                      {space ? <span className="text-slate-500"> — {space}</span> : null}
+                    </div>
+
+                    {reason ? <div className="mt-1 text-sm text-slate-700">{reason}</div> : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500">—</div>
+          )}
         </div>
       </section>
     </div>
