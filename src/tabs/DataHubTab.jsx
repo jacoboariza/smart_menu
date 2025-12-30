@@ -1,36 +1,44 @@
 import { Activity, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { health, ingestMenu, ingestOccupancy, normalizeRun, toUserError } from '../lib/apiClient.js'
 import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
 
-export default function DataHubTab({ sections }) {
+export default function DataHubTab({ editorState }) {
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [orgId, setOrgId] = useState('')
   const [restaurantId, setRestaurantId] = useState('resto-1')
   const [currency, setCurrency] = useState('EUR')
 
+  const [loading, setLoading] = useState({
+    health: false,
+    ingestMenu: false,
+    ingestOccupancy: false,
+    normalize: false,
+  })
+
   const [lastResponse, setLastResponse] = useState(null)
   const [lastError, setLastError] = useState(null)
   const [actionLog, setActionLog] = useState([])
-
-  const editorState = useMemo(() => ({ sections }), [sections])
 
   function pushLog(entry) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
   }
 
-  async function runAction(label, fn) {
+  async function runAction(label, key, fn) {
     setLastError(null)
     try {
       pushLog({ ts: new Date().toISOString(), action: label, status: 'running' })
+      setLoading((prev) => ({ ...prev, [key]: true }))
       const res = await fn()
       setLastResponse(res)
       pushLog({ ts: new Date().toISOString(), action: label, status: 'ok' })
     } catch (err) {
       setLastError(err)
       pushLog({ ts: new Date().toISOString(), action: label, status: 'error' })
+    } finally {
+      setLoading((prev) => ({ ...prev, [key]: false }))
     }
   }
 
@@ -38,6 +46,8 @@ export default function DataHubTab({ sections }) {
     setApiKey('')
     setOrgId('')
   }
+
+  const missingApiKey = !String(apiKey || '').trim()
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -120,24 +130,31 @@ export default function DataHubTab({ sections }) {
         </div>
       </section>
 
+      {missingApiKey && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Falta la <strong>API Key</strong>. Añádela para poder llamar al backend.
+        </div>
+      )}
+
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="text-sm font-semibold text-slate-800 mb-4">Acciones</div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() =>
-              runAction('Health', () => health({ apiKey, orgId: orgId || undefined }))
+              runAction('Health', 'health', () => health({ apiKey, orgId: orgId || undefined }))
             }
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            disabled={missingApiKey || loading.health}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <Activity className="h-4 w-4" />
-            Health
+            {loading.health ? 'Cargando…' : 'Health'}
           </button>
 
           <button
             type="button"
             onClick={() =>
-              runAction('Ingest menu (from editor)', async () => {
+              runAction('Ingest menu (from editor)', 'ingestMenu', async () => {
                 const payload = mapEditorStateToMenuIngest({
                   editorState,
                   restaurantId,
@@ -147,21 +164,32 @@ export default function DataHubTab({ sections }) {
                 return ingestMenu(payload, { apiKey, orgId: orgId || undefined })
               })
             }
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-sm font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm"
+            disabled={missingApiKey || loading.ingestMenu}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-sm font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
           >
             <Send className="h-4 w-4" />
-            Ingest menú (desde editor)
+            {loading.ingestMenu ? 'Enviando…' : 'Ingest menú (desde editor)'}
           </button>
 
           <button
             type="button"
             onClick={() =>
-              runAction('Ingest occupancy (demo)', async () => {
+              runAction('Ingest occupancy (demo)', 'ingestOccupancy', async () => {
+                const now = Date.now()
+                const ts = (deltaMs) => new Date(now - deltaMs).toISOString()
                 const payload = {
                   restaurantId,
                   signals: [
                     {
-                      ts: new Date().toISOString(),
+                      ts: ts(2 * 60 * 60 * 1000),
+                      occupancyPct: 28,
+                    },
+                    {
+                      ts: ts(60 * 60 * 1000),
+                      occupancyPct: 55,
+                    },
+                    {
+                      ts: ts(0),
                       occupancyPct: 42,
                     },
                   ],
@@ -170,21 +198,23 @@ export default function DataHubTab({ sections }) {
                 return ingestOccupancy(payload, { apiKey, orgId: orgId || undefined })
               })
             }
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            disabled={missingApiKey || loading.ingestOccupancy}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <Send className="h-4 w-4" />
-            Ingest ocupación (demo)
+            {loading.ingestOccupancy ? 'Enviando…' : 'Ingest ocupación (demo)'}
           </button>
 
           <button
             type="button"
             onClick={() =>
-              runAction('Normalize', () => normalizeRun({ apiKey, orgId: orgId || undefined }))
+              runAction('Normalize', 'normalize', () => normalizeRun({ apiKey, orgId: orgId || undefined }))
             }
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-sm font-medium text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm"
+            disabled={missingApiKey || loading.normalize}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-sm font-medium text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" />
-            Normalize
+            {loading.normalize ? 'Procesando…' : 'Normalize'}
           </button>
         </div>
 

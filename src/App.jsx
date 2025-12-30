@@ -1103,7 +1103,7 @@ ${jsonLdString}
           />
         )}
 
-        {activeTab === 'datahub' && <DataHubTab sections={sections} />}
+        {activeTab === 'datahub' && <DataHubTab editorState={{ sections }} />}
       </main>
 
       {showPdfModal && (
