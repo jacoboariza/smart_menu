@@ -128,6 +128,69 @@ export function debugNormalized({ apiKey, orgId, type, restaurantId } = {}) {
   })
 }
 
+function mapSpace(space) {
+  if (!space) return space
+  if (space === 'segittur-mock') return 'segittur'
+  if (space === 'gaiax-mock') return 'gaiax'
+  return space
+}
+
+export function listDataProducts({ apiKey, orgId, type, restaurantId } = {}) {
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  if (restaurantId) params.set('restaurantId', restaurantId)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+
+  return request(`/data-products${qs}`, {
+    method: 'GET',
+    headers: buildHeaders({ apiKey, orgId }),
+  })
+}
+
+export function buildDataProduct({ apiKey, orgId, type, restaurantId, policyOverrides } = {}) {
+  return request('/data-products/build', {
+    method: 'POST',
+    headers: buildHeaders({ apiKey, orgId }),
+    body: {
+      type,
+      restaurantId,
+      policyOverrides,
+    },
+  })
+}
+
+export function publishProduct({ apiKey, orgId, space, productId } = {}) {
+  const mapped = mapSpace(space)
+  return request(`/publish/${mapped}`, {
+    method: 'POST',
+    headers: buildHeaders({ apiKey, orgId }),
+    body: { productId },
+  })
+}
+
+export function consumeProduct({ apiKey, orgId, space, productId, purpose } = {}) {
+  const mapped = mapSpace(space)
+  return request(`/consume/${mapped}/${productId}`, {
+    method: 'POST',
+    headers: buildHeaders({ apiKey, orgId }),
+    body: { purpose },
+  })
+}
+
+export function listAuditLogs({ apiKey, orgId, action, productId, space, since } = {}) {
+  const params = new URLSearchParams()
+  if (action) params.set('action', action)
+  if (productId) params.set('productId', productId)
+  if (space) params.set('space', mapSpace(space))
+  if (since) params.set('since', since)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+
+  return request(`/audit/logs${qs}`, {
+    method: 'GET',
+    headers: buildHeaders({ apiKey, orgId }),
+  })
+}
+
 export function toUserError(err) {
   if (!err) return 'Ha ocurrido un error inesperado'
 
