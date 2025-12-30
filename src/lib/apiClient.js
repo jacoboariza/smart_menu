@@ -107,6 +107,27 @@ export function normalizeRun({ apiKey, orgId } = {}) {
   })
 }
 
+export function debugStaging({ apiKey, orgId, source } = {}) {
+  const params = new URLSearchParams()
+  if (source) params.set('source', source)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  return request(`/debug/staging${qs}`, {
+    method: 'GET',
+    headers: buildHeaders({ apiKey, orgId }),
+  })
+}
+
+export function debugNormalized({ apiKey, orgId, type, restaurantId } = {}) {
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  if (restaurantId) params.set('restaurantId', restaurantId)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  return request(`/debug/normalized${qs}`, {
+    method: 'GET',
+    headers: buildHeaders({ apiKey, orgId }),
+  })
+}
+
 export function toUserError(err) {
   if (!err) return 'Ha ocurrido un error inesperado'
 

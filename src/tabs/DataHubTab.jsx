@@ -1,7 +1,15 @@
-import { Activity, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Activity, Database, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
-import { health, ingestMenu, ingestOccupancy, normalizeRun, toUserError } from '../lib/apiClient.js'
+import {
+  debugNormalized,
+  debugStaging,
+  health,
+  ingestMenu,
+  ingestOccupancy,
+  normalizeRun,
+  toUserError,
+} from '../lib/apiClient.js'
 import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
 
 export default function DataHubTab({ editorState }) {
@@ -17,14 +25,67 @@ export default function DataHubTab({ editorState }) {
     ingestOccupancy: false,
     normalize: false,
     demo: false,
+    viewStaging: false,
+    viewNormalized: false,
   })
 
   const [lastResponse, setLastResponse] = useState(null)
   const [lastError, setLastError] = useState(null)
   const [actionLog, setActionLog] = useState([])
 
+  const [storageView, setStorageView] = useState(null)
+
   function pushLog(entry) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
+  }
+
+  async function viewStaging(source) {
+    setLastError(null)
+    setStorageView(null)
+    setLoading((prev) => ({ ...prev, viewStaging: true }))
+    try {
+      const res = await debugStaging({ apiKey, orgId: orgId || undefined, source })
+      setStorageView({
+        kind: 'staging',
+        label: `Staging (${source})`,
+        count: res?.count ?? 0,
+        items: Array.isArray(res?.items) ? res.items : [],
+      })
+      setLastResponse(res)
+      stepLog(`View staging (${source})`, 'ok')
+    } catch (err) {
+      setLastError(err)
+      stepLog(`View staging (${source})`, 'error')
+    } finally {
+      setLoading((prev) => ({ ...prev, viewStaging: false }))
+    }
+  }
+
+  async function viewNormalized(type) {
+    setLastError(null)
+    setStorageView(null)
+    setLoading((prev) => ({ ...prev, viewNormalized: true }))
+    try {
+      const res = await debugNormalized({
+        apiKey,
+        orgId: orgId || undefined,
+        type,
+        restaurantId: restaurantId || undefined,
+      })
+      setStorageView({
+        kind: 'normalized',
+        label: `Normalizados (${type})`,
+        count: res?.count ?? 0,
+        items: Array.isArray(res?.items) ? res.items : [],
+      })
+      setLastResponse(res)
+      stepLog(`View normalized (${type})`, 'ok')
+    } catch (err) {
+      setLastError(err)
+      stepLog(`View normalized (${type})`, 'error')
+    } finally {
+      setLoading((prev) => ({ ...prev, viewNormalized: false }))
+    }
   }
 
   function stepLog(label, status) {
@@ -108,6 +169,28 @@ export default function DataHubTab({ editorState }) {
           <p className="text-sm text-slate-500">Llama al backend (Netlify Functions) con el estado actual del editor.</p>
         </div>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold text-slate-800">Estado del almacenamiento</div>
+          {storageView?.label && (
+            <div className="text-xs text-slate-500">{storageView.label}</div>
+          )}
+        </div>
+
+        {storageView ? (
+          <>
+            <div className="text-sm text-slate-700 mb-3">
+              Conteo: <span className="font-semibold">{storageView.count}</span>
+            </div>
+            <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-80">
+              {JSON.stringify(storageView.items.slice(0, 5), null, 2)}
+            </pre>
+          </>
+        ) : (
+          <div className="text-sm text-slate-500">—</div>
+        )}
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between mb-4">
@@ -276,6 +359,46 @@ export default function DataHubTab({ editorState }) {
           >
             <RefreshCw className={`h-4 w-4 ${loading.demo ? 'animate-spin' : ''}`} />
             {loading.demo ? 'Ejecutando demo…' : 'Run demo (menu+occupancy+normalize)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => viewStaging('menu')}
+            disabled={missingApiKey || loading.viewStaging}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {loading.viewStaging ? 'Cargando…' : 'Ver staging (menu)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => viewStaging('occupancy')}
+            disabled={missingApiKey || loading.viewStaging}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {loading.viewStaging ? 'Cargando…' : 'Ver staging (occupancy)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => viewNormalized('menu')}
+            disabled={missingApiKey || loading.viewNormalized}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {loading.viewNormalized ? 'Cargando…' : 'Ver normalizados (menu)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => viewNormalized('occupancy')}
+            disabled={missingApiKey || loading.viewNormalized}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {loading.viewNormalized ? 'Cargando…' : 'Ver normalizados (occupancy)'}
           </button>
         </div>
 

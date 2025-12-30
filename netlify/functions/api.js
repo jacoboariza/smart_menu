@@ -3,6 +3,8 @@ import { listBySource } from '../../server/storage/stagingRepo.js'
 import {
   upsertMenuItems,
   upsertOccupancySignals,
+  listMenuItems,
+  listOccupancySignals,
 } from '../../server/storage/normalizedRepo.js'
 import { getById as getDataProduct } from '../../server/storage/dataProductRepo.js'
 import { list as listAudit } from '../../server/storage/auditRepo.js'
@@ -71,6 +73,16 @@ function isNormalizeRun(path) {
   return normalized.endsWith('/normalize/run') || normalized.includes('/normalize/run')
 }
 
+function isDebugStaging(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/debug/staging') || normalized.includes('/debug/staging')
+}
+
+function isDebugNormalized(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/debug/normalized') || normalized.includes('/debug/normalized')
+}
+
 export async function handler(event, context) {
   const method = event.httpMethod
   const path = event.path || ''
@@ -80,6 +92,8 @@ export async function handler(event, context) {
     if (!requireAuth(event)) {
       return buildResponse(401, { error: { code: 'unauthorized', message: 'Missing or invalid API key' } })
     }
+
+    const orgId = event.headers?.['x-org-id'] || event.headers?.['X-Org-Id'] || null
 
     // GET /audit/logs
     if (isAuditLogs(path)) {
@@ -95,6 +109,51 @@ export async function handler(event, context) {
         return buildResponse(200, { logs })
       } catch (err) {
         return buildResponse(500, { error: { code: 'audit_error', message: err.message } })
+      }
+    }
+
+    // GET /debug/staging?source=menu|occupancy
+    if (isDebugStaging(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const source = params.source
+        if (source !== 'menu' && source !== 'occupancy') {
+          return buildResponse(400, {
+            error: {
+              code: 'invalid_source',
+              message: "source must be 'menu' or 'occupancy'",
+            },
+          })
+        }
+
+        const records = await listBySource(source, orgId || undefined)
+        return buildResponse(200, { source, count: records.length, items: records })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'debug_error', message: err.message } })
+      }
+    }
+
+    // GET /debug/normalized?type=menu|occupancy
+    if (isDebugNormalized(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const type = params.type
+        if (type !== 'menu' && type !== 'occupancy') {
+          return buildResponse(400, {
+            error: {
+              code: 'invalid_type',
+              message: "type must be 'menu' or 'occupancy'",
+            },
+          })
+        }
+
+        const items = type === 'menu'
+          ? await listMenuItems(params.restaurantId || undefined)
+          : await listOccupancySignals(params.restaurantId || undefined)
+
+        return buildResponse(200, { type, count: items.length, items })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'debug_error', message: err.message } })
       }
     }
 
