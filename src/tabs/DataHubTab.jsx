@@ -2,6 +2,7 @@ import { Activity, Database, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide
 import { useState } from 'react'
 
 import {
+  buildDataProduct,
   listDataProducts,
   debugNormalized,
   debugStaging,
@@ -28,6 +29,11 @@ export default function DataHubTab({ editorState }) {
   })
   const [dataProductsLoading, setDataProductsLoading] = useState(false)
   const [dataProductsError, setDataProductsError] = useState(null)
+
+  const [buildType, setBuildType] = useState('menu')
+  const [policyOverridesText, setPolicyOverridesText] = useState('')
+  const [buildLoading, setBuildLoading] = useState(false)
+  const [buildError, setBuildError] = useState(null)
 
   const [loading, setLoading] = useState({
     health: false,
@@ -68,6 +74,50 @@ export default function DataHubTab({ editorState }) {
       stepLog(`View staging (${source})`, 'error')
     } finally {
       setLoading((prev) => ({ ...prev, viewStaging: false }))
+    }
+  }
+
+  async function onBuildDataProduct() {
+    setBuildError(null)
+    setLastError(null)
+    setBuildLoading(true)
+
+    try {
+      const restaurantIdValue = dataProductsFilters.restaurantId || undefined
+
+      let policyOverrides
+      if (String(policyOverridesText || '').trim()) {
+        try {
+          policyOverrides = JSON.parse(policyOverridesText)
+        } catch {
+          const err = {
+            code: 'client_invalid_json',
+            message: 'policyOverrides no es JSON válido',
+          }
+          setBuildError(err)
+          setLastError(err)
+          return
+        }
+      }
+
+      const res = await buildDataProduct({
+        apiKey,
+        orgId: orgId || undefined,
+        type: buildType,
+        restaurantId: restaurantIdValue,
+        policyOverrides,
+      })
+
+      setSelectedDataProduct(res)
+      setLastResponse(res)
+      stepLog('Build data product', 'ok')
+      await refreshDataProducts()
+    } catch (err) {
+      setBuildError(err)
+      setLastError(err)
+      stepLog('Build data product', 'error')
+    } finally {
+      setBuildLoading(false)
     }
   }
 
@@ -516,6 +566,68 @@ export default function DataHubTab({ editorState }) {
             <RefreshCw className={`h-3.5 w-3.5 ${dataProductsLoading ? 'animate-spin' : ''}`} />
             {dataProductsLoading ? 'Refreshing…' : 'Refresh'}
           </button>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-slate-800">Build</div>
+            <button
+              type="button"
+              onClick={onBuildDataProduct}
+              disabled={missingApiKey || buildLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-xs font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${buildLoading ? 'animate-spin' : ''}`} />
+              {buildLoading ? 'Building…' : 'Build'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">type</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                value={buildType}
+                onChange={(e) => setBuildType(e.target.value)}
+              >
+                <option value="menu">menu</option>
+                <option value="occupancy">occupancy</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">restaurantId</label>
+              <input
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                value={dataProductsFilters.restaurantId}
+                onChange={(e) =>
+                  setDataProductsFilters((prev) => ({
+                    ...prev,
+                    restaurantId: e.target.value,
+                  }))
+                }
+                placeholder="resto-1"
+                autoComplete="off"
+              />
+              <div className="mt-2 text-[11px] text-slate-500">Se usa el mismo restaurantId del filtro de arriba.</div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-slate-600 mb-1">policyOverrides (JSON, opcional)</label>
+            <textarea
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-200 min-h-24"
+              value={policyOverridesText}
+              onChange={(e) => setPolicyOverridesText(e.target.value)}
+              placeholder='{"allowedPurposes":["analytics"],"retentionDays":30}'
+            />
+          </div>
+
+          {buildError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {toUserError(buildError)}
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
