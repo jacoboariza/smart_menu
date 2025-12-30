@@ -61,6 +61,67 @@ export default function DataHubTab({ editorState }) {
   const [dataSpaceDemoLoading, setDataSpaceDemoLoading] = useState(false)
 
   useEffect(() => {
+    try {
+      const storedOrgId = sessionStorage.getItem('dataHub.orgId')
+      const storedRestaurantId = sessionStorage.getItem('dataHub.restaurantId')
+      const storedCurrency = sessionStorage.getItem('dataHub.currency')
+      const storedSpace = sessionStorage.getItem('dataHub.lastSpace')
+      const storedPurpose = sessionStorage.getItem('dataHub.lastPurpose')
+
+      if (storedOrgId !== null) setOrgId(storedOrgId)
+      if (storedRestaurantId !== null) {
+        setRestaurantId(storedRestaurantId)
+        setDataProductsFilters((prev) => ({ ...prev, restaurantId: storedRestaurantId }))
+      }
+      if (storedCurrency !== null) setCurrency(storedCurrency)
+      if (storedSpace !== null) setPublishSpace(storedSpace)
+      if (storedPurpose !== null) setConsumePurpose(storedPurpose)
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.orgId', orgId || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [orgId])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.restaurantId', restaurantId || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [restaurantId])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.currency', currency || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [currency])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.lastSpace', publishSpace || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [publishSpace])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.lastPurpose', consumePurpose || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [consumePurpose])
+
+  useEffect(() => {
     if (!selectedDataProduct?.id) return
     setAuditFilters((prev) => {
       if (String(prev.productId || '').trim()) return prev
