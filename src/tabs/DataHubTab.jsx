@@ -1,6 +1,10 @@
 import { Activity, Database, Eye, EyeOff, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import ActionButton from '../components/ActionButton.jsx'
+import Card from '../components/Card.jsx'
+import Field from '../components/Field.jsx'
+import JsonViewer from '../components/JsonViewer.jsx'
 import {
   buildDataProduct,
   listDataProducts,
@@ -596,7 +600,7 @@ export default function DataHubTab({ editorState }) {
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-slate-800">Estado del almacenamiento</div>
           {storageView?.label && (
@@ -609,31 +613,27 @@ export default function DataHubTab({ editorState }) {
             <div className="text-sm text-slate-700 mb-3">
               Conteo: <span className="font-semibold">{storageView.count}</span>
             </div>
-            <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-80">
-              {JSON.stringify(storageView.items.slice(0, 5), null, 2)}
-            </pre>
+            <JsonViewer value={storageView.items.slice(0, 5)} />
           </>
         ) : (
           <div className="text-sm text-slate-500">—</div>
         )}
-      </section>
+      </Card>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-slate-800">Credenciales</div>
-          <button
-            type="button"
+          <ActionButton
             onClick={clearCredentials}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Trash2 className="h-3.5 w-3.5" />}
           >
-            <Trash2 className="h-3.5 w-3.5" />
             Limpiar credenciales
-          </button>
+          </ActionButton>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">API Key</label>
+          <Field label="API Key" hint="Se guarda solo en estado React (no se persiste).">
             <div className="flex gap-2">
               <input
                 type={showApiKey ? 'text' : 'password'}
@@ -643,20 +643,15 @@ export default function DataHubTab({ editorState }) {
                 placeholder="mykey"
                 autoComplete="off"
               />
-              <button
-                type="button"
+              <ActionButton
                 onClick={() => setShowApiKey((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                title={showApiKey ? 'Ocultar' : 'Mostrar'}
-              >
-                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+                className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                icon={showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              />
             </div>
-            <div className="mt-2 text-[11px] text-slate-500">Se guarda solo en estado React (no se persiste).</div>
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">OrgId</label>
+          <Field label="OrgId">
             <input
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
               value={orgId}
@@ -664,10 +659,9 @@ export default function DataHubTab({ editorState }) {
               placeholder="org-1"
               autoComplete="off"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">RestaurantId</label>
+          <Field label="RestaurantId">
             <input
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
               value={restaurantId}
@@ -675,10 +669,9 @@ export default function DataHubTab({ editorState }) {
               placeholder="resto-1"
               autoComplete="off"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Currency</label>
+          <Field label="Currency">
             <input
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
               value={currency}
@@ -686,9 +679,9 @@ export default function DataHubTab({ editorState }) {
               placeholder="EUR"
               autoComplete="off"
             />
-          </div>
+          </Field>
         </div>
-      </section>
+      </Card>
 
       {missingApiKey && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -696,23 +689,21 @@ export default function DataHubTab({ editorState }) {
         </div>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="text-sm font-semibold text-slate-800 mb-4">Acciones</div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              runAction('Health', 'health', () => health({ apiKey, orgId: orgId || undefined }))
-            }
-            disabled={missingApiKey || loading.health}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          <ActionButton
+            onClick={() => runAction('Health', 'health', () => health({ apiKey, orgId: orgId || undefined }))}
+            disabled={missingApiKey}
+            loading={loading.health}
+            loadingText="Cargando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Activity className="h-4 w-4" />}
           >
-            <Activity className="h-4 w-4" />
-            {loading.health ? 'Cargando…' : 'Health'}
-          </button>
+            Health
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() =>
               runAction('Ingest menu (from editor)', 'ingestMenu', async () => {
                 const payload = mapEditorStateToMenuIngest({
@@ -724,15 +715,16 @@ export default function DataHubTab({ editorState }) {
                 return ingestMenu(payload, { apiKey, orgId: orgId || undefined })
               })
             }
-            disabled={missingApiKey || loading.ingestMenu}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-sm font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.ingestMenu}
+            loadingText="Enviando…"
+            className="bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm"
+            icon={<Send className="h-4 w-4" />}
           >
-            <Send className="h-4 w-4" />
-            {loading.ingestMenu ? 'Enviando…' : 'Ingest menú (desde editor)'}
-          </button>
+            Ingest menú (desde editor)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() =>
               runAction('Ingest occupancy (demo)', 'ingestOccupancy', async () => {
                 const now = Date.now()
@@ -758,114 +750,117 @@ export default function DataHubTab({ editorState }) {
                 return ingestOccupancy(payload, { apiKey, orgId: orgId || undefined })
               })
             }
-            disabled={missingApiKey || loading.ingestOccupancy}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.ingestOccupancy}
+            loadingText="Enviando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Send className="h-4 w-4" />}
           >
-            <Send className="h-4 w-4" />
-            {loading.ingestOccupancy ? 'Enviando…' : 'Ingest ocupación (demo)'}
-          </button>
+            Ingest ocupación (demo)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() =>
               runAction('Normalize', 'normalize', () => normalizeRun({ apiKey, orgId: orgId || undefined }))
             }
-            disabled={missingApiKey || loading.normalize}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-sm font-medium text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.normalize}
+            loadingText="Procesando…"
+            className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm"
+            icon={<RefreshCw className="h-4 w-4" />}
           >
-            <RefreshCw className="h-4 w-4" />
-            {loading.normalize ? 'Procesando…' : 'Normalize'}
-          </button>
+            Normalize
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={runDemoFlow}
-            disabled={missingApiKey || loading.demo}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-sm font-medium text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.demo}
+            loadingText="Ejecutando demo…"
+            className="bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm"
+            icon={<RefreshCw className="h-4 w-4" />}
           >
-            <RefreshCw className={`h-4 w-4 ${loading.demo ? 'animate-spin' : ''}`} />
-            {loading.demo ? 'Ejecutando demo…' : 'Run demo (menu+occupancy+normalize)'}
-          </button>
+            Run demo (menu+occupancy+normalize)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() => viewStaging('menu')}
-            disabled={missingApiKey || loading.viewStaging}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.viewStaging}
+            loadingText="Cargando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Database className="h-4 w-4" />}
           >
-            <Database className="h-4 w-4" />
-            {loading.viewStaging ? 'Cargando…' : 'Ver staging (menu)'}
-          </button>
+            Ver staging (menu)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() => viewStaging('occupancy')}
-            disabled={missingApiKey || loading.viewStaging}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.viewStaging}
+            loadingText="Cargando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Database className="h-4 w-4" />}
           >
-            <Database className="h-4 w-4" />
-            {loading.viewStaging ? 'Cargando…' : 'Ver staging (occupancy)'}
-          </button>
+            Ver staging (occupancy)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() => viewNormalized('menu')}
-            disabled={missingApiKey || loading.viewNormalized}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.viewNormalized}
+            loadingText="Cargando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Database className="h-4 w-4" />}
           >
-            <Database className="h-4 w-4" />
-            {loading.viewNormalized ? 'Cargando…' : 'Ver normalizados (menu)'}
-          </button>
+            Ver normalizados (menu)
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={() => viewNormalized('occupancy')}
-            disabled={missingApiKey || loading.viewNormalized}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={missingApiKey}
+            loading={loading.viewNormalized}
+            loadingText="Cargando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Database className="h-4 w-4" />}
           >
-            <Database className="h-4 w-4" />
-            {loading.viewNormalized ? 'Cargando…' : 'Ver normalizados (occupancy)'}
-          </button>
+            Ver normalizados (occupancy)
+          </ActionButton>
         </div>
 
         <div className="mt-4 text-[11px] text-slate-500">
           Tip: si estás usando Netlify Dev, puedes configurar <code className="font-mono">VITE_API_BASE_URL</code>.
         </div>
-      </section>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <Card as="section">
           <div className="text-sm font-semibold text-slate-800 mb-3">Última respuesta</div>
-          <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-80">
-            {lastResponse ? JSON.stringify(lastResponse, null, 2) : '—'}
-          </pre>
-        </section>
+          <JsonViewer value={lastResponse} />
+        </Card>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <Card as="section">
           <div className="text-sm font-semibold text-slate-800 mb-3">Errores</div>
           {lastError ? (
             <>
               <div className="text-sm text-red-700 mb-2">{toUserError(lastError)}</div>
-              <pre className="text-xs bg-red-50 border border-red-200 rounded-lg p-3 overflow-auto max-h-80">
-                {JSON.stringify(
-                  {
-                    status: lastError.status,
-                    code: lastError.code,
-                    message: lastError.message,
-                    details: lastError.details,
-                  },
-                  null,
-                  2,
-                )}
-              </pre>
+              <JsonViewer
+                className="bg-red-50 border-red-200"
+                value={{
+                  status: lastError.status,
+                  code: lastError.code,
+                  message: lastError.message,
+                  details: lastError.details,
+                }}
+              />
             </>
           ) : (
             <div className="text-sm text-slate-500">—</div>
           )}
-        </section>
+        </Card>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="text-sm font-semibold text-slate-800 mb-3">Log de acciones</div>
         {actionLog.length ? (
           <div className="space-y-2">
@@ -894,46 +889,49 @@ export default function DataHubTab({ editorState }) {
         ) : (
           <div className="text-sm text-slate-500">—</div>
         )}
-      </section>
+      </Card>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-slate-800">Data Products</div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <ActionButton
               onClick={runDataSpaceDemoMenu}
-              disabled={missingApiKey || dataSpaceDemoLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-xs font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
+              disabled={missingApiKey}
+              loading={dataSpaceDemoLoading}
+              loadingText="Running…"
+              className="bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${dataSpaceDemoLoading ? 'animate-spin' : ''}`} />
-              {dataSpaceDemoLoading ? 'Running…' : 'Run data-space demo (menu)'}
-            </button>
+              Run data-space demo (menu)
+            </ActionButton>
 
-            <button
-              type="button"
+            <ActionButton
               onClick={refreshDataProducts}
-              disabled={missingApiKey || dataProductsLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              disabled={missingApiKey}
+              loading={dataProductsLoading}
+              loadingText="Refreshing…"
+              className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${dataProductsLoading ? 'animate-spin' : ''}`} />
-              {dataProductsLoading ? 'Refreshing…' : 'Refresh'}
-            </button>
+              Refresh
+            </ActionButton>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-slate-800">Build</div>
-            <button
-              type="button"
+            <ActionButton
               onClick={onBuildDataProduct}
-              disabled={missingApiKey || buildLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-2 text-xs font-medium text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm disabled:opacity-50"
+              disabled={missingApiKey}
+              loading={buildLoading}
+              loadingText="Building…"
+              className="bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all shadow-sm text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${buildLoading ? 'animate-spin' : ''}`} />
-              {buildLoading ? 'Building…' : 'Build'}
-            </button>
+              Build
+            </ActionButton>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -1050,13 +1048,12 @@ export default function DataHubTab({ editorState }) {
                     <td className="py-2 pr-3 text-slate-700">{p?.metadata?.restaurantId}</td>
                     <td className="py-2 pr-3 text-slate-700">{p.createdAt}</td>
                     <td className="py-2 pr-3">
-                      <button
-                        type="button"
+                      <ActionButton
                         onClick={() => setSelectedDataProduct(p)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        className="border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         Select
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))}
@@ -1069,23 +1066,22 @@ export default function DataHubTab({ editorState }) {
 
         <div className="mt-4">
           <div className="text-xs font-semibold text-slate-700 mb-2">selectedDataProduct</div>
-          <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-64">
-            {selectedDataProduct ? JSON.stringify(selectedDataProduct, null, 2) : '—'}
-          </pre>
+          <JsonViewer value={selectedDataProduct} maxHeightClassName="max-h-64" />
         </div>
 
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-slate-800">Publish</div>
-            <button
-              type="button"
+            <ActionButton
               onClick={onPublishSelectedProduct}
-              disabled={missingApiKey || publishLoading || !selectedDataProduct?.id}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-xs font-medium text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm disabled:opacity-50"
+              disabled={missingApiKey || !selectedDataProduct?.id}
+              loading={publishLoading}
+              loadingText="Publishing…"
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${publishLoading ? 'animate-spin' : ''}`} />
-              {publishLoading ? 'Publishing…' : 'Publish selected'}
-            </button>
+              Publish selected
+            </ActionButton>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -1142,15 +1138,16 @@ export default function DataHubTab({ editorState }) {
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-slate-800">Consume</div>
-            <button
-              type="button"
+            <ActionButton
               onClick={onConsumeSelectedProduct}
-              disabled={missingApiKey || consumeLoading || !selectedDataProduct?.id}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-xs font-medium text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm disabled:opacity-50"
+              disabled={missingApiKey || !selectedDataProduct?.id}
+              loading={consumeLoading}
+              loadingText="Consuming…"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${consumeLoading ? 'animate-spin' : ''}`} />
-              {consumeLoading ? 'Consuming…' : 'Consume selected'}
-            </button>
+              Consume selected
+            </ActionButton>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -1206,35 +1203,33 @@ export default function DataHubTab({ editorState }) {
 
           <div className="mt-4">
             <div className="text-xs font-semibold text-slate-700 mb-2">result</div>
-            <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-64">
-              {consumeResult ? JSON.stringify(consumeResult, null, 2) : '—'}
-            </pre>
+            <JsonViewer value={consumeResult} maxHeightClassName="max-h-64" />
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <Card as="section">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-slate-800">Audit Logs</div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <ActionButton
               onClick={onAuditAutofillFromSelected}
               disabled={!selectedDataProduct?.id}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs"
             >
               Auto-fill from selected
-            </button>
+            </ActionButton>
 
-            <button
-              type="button"
+            <ActionButton
               onClick={onFetchAuditLogs}
-              disabled={missingApiKey || auditLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              disabled={missingApiKey}
+              loading={auditLoading}
+              loadingText="Fetching…"
+              className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${auditLoading ? 'animate-spin' : ''}`} />
-              {auditLoading ? 'Fetching…' : 'Fetch logs'}
-            </button>
+              Fetch logs
+            </ActionButton>
           </div>
         </div>
 
@@ -1344,7 +1339,7 @@ export default function DataHubTab({ editorState }) {
             <div className="text-sm text-slate-500">—</div>
           )}
         </div>
-      </section>
+      </Card>
     </div>
   )
 }
