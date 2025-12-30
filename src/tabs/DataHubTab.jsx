@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   buildDataProduct,
   listDataProducts,
+  publishProduct,
   debugNormalized,
   debugStaging,
   health,
@@ -34,6 +35,11 @@ export default function DataHubTab({ editorState }) {
   const [policyOverridesText, setPolicyOverridesText] = useState('')
   const [buildLoading, setBuildLoading] = useState(false)
   const [buildError, setBuildError] = useState(null)
+
+  const [publishSpace, setPublishSpace] = useState('segittur-mock')
+  const [publishLoading, setPublishLoading] = useState(false)
+  const [publishError, setPublishError] = useState(null)
+  const [publishedStatus, setPublishedStatus] = useState({})
 
   const [loading, setLoading] = useState({
     health: false,
@@ -74,6 +80,59 @@ export default function DataHubTab({ editorState }) {
       stepLog(`View staging (${source})`, 'error')
     } finally {
       setLoading((prev) => ({ ...prev, viewStaging: false }))
+    }
+  }
+
+  async function onPublishSelectedProduct() {
+    setPublishError(null)
+    setLastError(null)
+    setPublishLoading(true)
+
+    const productId = selectedDataProduct?.id
+    if (!productId) {
+      const err = { code: 'missing_product_id', message: 'No hay data product seleccionado' }
+      setPublishError(err)
+      setLastError(err)
+      setPublishLoading(false)
+      return
+    }
+
+    try {
+      const res = await publishProduct({
+        apiKey,
+        orgId: orgId || undefined,
+        space: publishSpace,
+        productId,
+      })
+
+      setLastResponse(res)
+      setPublishedStatus((prev) => ({
+        ...prev,
+        [publishSpace]: {
+          ok: true,
+          ts: new Date().toISOString(),
+          result: res,
+        },
+      }))
+      stepLog(`PUBLISH (${publishSpace})`, 'ok')
+    } catch (err) {
+      setPublishError(err)
+      setLastError(err)
+      setPublishedStatus((prev) => ({
+        ...prev,
+        [publishSpace]: {
+          ok: false,
+          ts: new Date().toISOString(),
+          error: {
+            status: err?.status,
+            code: err?.code,
+            message: err?.message,
+          },
+        },
+      }))
+      stepLog(`PUBLISH (${publishSpace})`, 'error')
+    } finally {
+      setPublishLoading(false)
     }
   }
 
@@ -718,6 +777,71 @@ export default function DataHubTab({ editorState }) {
           <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto max-h-64">
             {selectedDataProduct ? JSON.stringify(selectedDataProduct, null, 2) : '—'}
           </pre>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-slate-800">Publish</div>
+            <button
+              type="button"
+              onClick={onPublishSelectedProduct}
+              disabled={missingApiKey || publishLoading || !selectedDataProduct?.id}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-xs font-medium text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${publishLoading ? 'animate-spin' : ''}`} />
+              {publishLoading ? 'Publishing…' : 'Publish selected'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">space</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                value={publishSpace}
+                onChange={(e) => setPublishSpace(e.target.value)}
+              >
+                <option value="segittur-mock">segittur-mock</option>
+                <option value="gaiax-mock">gaiax-mock</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <div className="text-xs font-medium text-slate-600 mb-1">Estado por space</div>
+              <div className="flex flex-wrap gap-2">
+                {['segittur-mock', 'gaiax-mock'].map((space) => {
+                  const status = publishedStatus?.[space]
+                  const label = status
+                    ? status.ok
+                      ? `✅ ${space} — ${status.ts}`
+                      : `❌ ${space} — ${status.ts}`
+                    : `${space} — —`
+
+                  return (
+                    <span
+                      key={space}
+                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                        !status
+                          ? 'border-slate-200 bg-white text-slate-600'
+                          : status.ok
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            : 'border-red-200 bg-red-50 text-red-800'
+                      }`}
+                      title={status?.ok ? 'Último publish OK' : status ? 'Último publish FAILED' : 'Sin publish'}
+                    >
+                      {label}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {publishError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {toUserError(publishError)}
+            </div>
+          )}
         </div>
       </section>
     </div>
