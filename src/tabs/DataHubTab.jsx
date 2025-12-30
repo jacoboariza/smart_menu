@@ -16,6 +16,7 @@ export default function DataHubTab({ editorState }) {
     ingestMenu: false,
     ingestOccupancy: false,
     normalize: false,
+    demo: false,
   })
 
   const [lastResponse, setLastResponse] = useState(null)
@@ -24,6 +25,11 @@ export default function DataHubTab({ editorState }) {
 
   function pushLog(entry) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
+  }
+
+  function stepLog(label, status) {
+    const suffix = status === 'ok' ? ' ✅' : status === 'error' ? ' ❌' : ''
+    pushLog({ ts: new Date().toISOString(), action: `${label}${suffix}`, status })
   }
 
   async function runAction(label, key, fn) {
@@ -39,6 +45,51 @@ export default function DataHubTab({ editorState }) {
       pushLog({ ts: new Date().toISOString(), action: label, status: 'error' })
     } finally {
       setLoading((prev) => ({ ...prev, [key]: false }))
+    }
+  }
+
+  async function runDemoFlow() {
+    setLastError(null)
+    setLastResponse(null)
+    setLoading((prev) => ({ ...prev, demo: true }))
+
+    try {
+      const headers = { apiKey, orgId: orgId || undefined }
+
+      stepLog('Demo: ingest menu', 'running')
+      const menuPayload = mapEditorStateToMenuIngest({
+        editorState,
+        restaurantId,
+        currency,
+      })
+      const menuRes = await ingestMenu(menuPayload, headers)
+      setLastResponse(menuRes)
+      stepLog('Demo: ingest menu', 'ok')
+
+      stepLog('Demo: ingest occupancy', 'running')
+      const now = Date.now()
+      const ts = (deltaMs) => new Date(now - deltaMs).toISOString()
+      const occupancyPayload = {
+        restaurantId,
+        signals: [
+          { ts: ts(2 * 60 * 60 * 1000), occupancyPct: 28 },
+          { ts: ts(60 * 60 * 1000), occupancyPct: 55 },
+          { ts: ts(0), occupancyPct: 42 },
+        ],
+      }
+      const occRes = await ingestOccupancy(occupancyPayload, headers)
+      setLastResponse(occRes)
+      stepLog('Demo: ingest occupancy', 'ok')
+
+      stepLog('Demo: normalize', 'running')
+      const normRes = await normalizeRun(headers)
+      setLastResponse(normRes)
+      stepLog('Demo: normalize', 'ok')
+    } catch (err) {
+      setLastError(err)
+      stepLog('Demo: aborted', 'error')
+    } finally {
+      setLoading((prev) => ({ ...prev, demo: false }))
     }
   }
 
@@ -215,6 +266,16 @@ export default function DataHubTab({ editorState }) {
           >
             <RefreshCw className="h-4 w-4" />
             {loading.normalize ? 'Procesando…' : 'Normalize'}
+          </button>
+
+          <button
+            type="button"
+            onClick={runDemoFlow}
+            disabled={missingApiKey || loading.demo}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-sm font-medium text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading.demo ? 'animate-spin' : ''}`} />
+            {loading.demo ? 'Ejecutando demo…' : 'Run demo (menu+occupancy+normalize)'}
           </button>
         </div>
 
