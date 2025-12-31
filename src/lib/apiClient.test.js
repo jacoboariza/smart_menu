@@ -29,7 +29,7 @@ describe('apiClient (data products / publish / consume / audit)', () => {
   it('listDataProducts builds query params and sends auth headers', async () => {
     mockFetchJson({ products: [] })
 
-    await listDataProducts({ apiKey: 'k', orgId: 'o', type: 'menu', restaurantId: 'r1' })
+    await listDataProducts({ apiKey: 'k', orgId: 'o', roles: ['restaurant', 'admin'], type: 'menu', restaurantId: 'r1' })
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
     const [url, init] = globalThis.fetch.mock.calls[0]
@@ -38,6 +38,7 @@ describe('apiClient (data products / publish / consume / audit)', () => {
     expect(init.method).toBe('GET')
     expect(init.headers.get('X-API-Key')).toBe('k')
     expect(init.headers.get('X-Org-Id')).toBe('o')
+    expect(init.headers.get('X-Roles')).toBe('restaurant,admin')
   })
 
   it('buildDataProduct posts JSON body and headers', async () => {
@@ -65,11 +66,12 @@ describe('apiClient (data products / publish / consume / audit)', () => {
   it('publishProduct maps segittur-mock to segittur in path', async () => {
     mockFetchJson({ space: 'segittur', productId: 'p1' })
 
-    await publishProduct({ apiKey: 'k', space: 'segittur-mock', productId: 'p1' })
+    await publishProduct({ apiKey: 'k', roles: ['destination'], space: 'segittur-mock', productId: 'p1' })
 
     const [url, init] = globalThis.fetch.mock.calls[0]
     expect(url).toBe('/.netlify/functions/api/publish/segittur')
     expect(init.method).toBe('POST')
+    expect(init.headers.get('X-Roles')).toBe('destination')
     expect(JSON.parse(init.body)).toEqual({ productId: 'p1' })
   })
 

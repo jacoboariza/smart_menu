@@ -72,59 +72,64 @@ export async function request(path, options = {}) {
   return payload
 }
 
-function buildHeaders({ apiKey, orgId } = {}) {
+function buildHeaders({ apiKey, orgId, roles } = {}) {
   const headers = {}
   if (apiKey) headers['X-API-Key'] = apiKey
   if (orgId) headers['X-Org-Id'] = orgId
+
+  if (Array.isArray(roles) && roles.length) {
+    headers['X-Roles'] = roles.join(',')
+  }
+
   return headers
 }
 
-export function health({ apiKey, orgId } = {}) {
-  return request('/audit/logs', { method: 'GET', headers: buildHeaders({ apiKey, orgId }) })
+export function health({ apiKey, orgId, roles } = {}) {
+  return request('/audit/logs', { method: 'GET', headers: buildHeaders({ apiKey, orgId, roles }) })
 }
 
-export function ingestMenu(payload, { apiKey, orgId } = {}) {
+export function ingestMenu(payload, { apiKey, orgId, roles } = {}) {
   return request('/ingest/menu', {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: payload,
   })
 }
 
-export function ingestOccupancy(payload, { apiKey, orgId } = {}) {
+export function ingestOccupancy(payload, { apiKey, orgId, roles } = {}) {
   return request('/ingest/occupancy', {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: payload,
   })
 }
 
-export function normalizeRun({ apiKey, orgId } = {}) {
+export function normalizeRun({ apiKey, orgId, roles } = {}) {
   return request('/normalize/run', {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: {},
   })
 }
 
-export function debugStaging({ apiKey, orgId, source } = {}) {
+export function debugStaging({ apiKey, orgId, roles, source } = {}) {
   const params = new URLSearchParams()
   if (source) params.set('source', source)
   const qs = params.toString() ? `?${params.toString()}` : ''
   return request(`/debug/staging${qs}`, {
     method: 'GET',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
   })
 }
 
-export function debugNormalized({ apiKey, orgId, type, restaurantId } = {}) {
+export function debugNormalized({ apiKey, orgId, roles, type, restaurantId } = {}) {
   const params = new URLSearchParams()
   if (type) params.set('type', type)
   if (restaurantId) params.set('restaurantId', restaurantId)
   const qs = params.toString() ? `?${params.toString()}` : ''
   return request(`/debug/normalized${qs}`, {
     method: 'GET',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
   })
 }
 
@@ -135,7 +140,7 @@ function mapSpace(space) {
   return space
 }
 
-export function listDataProducts({ apiKey, orgId, type, restaurantId } = {}) {
+export function listDataProducts({ apiKey, orgId, roles, type, restaurantId } = {}) {
   const params = new URLSearchParams()
   if (type) params.set('type', type)
   if (restaurantId) params.set('restaurantId', restaurantId)
@@ -143,14 +148,14 @@ export function listDataProducts({ apiKey, orgId, type, restaurantId } = {}) {
 
   return request(`/data-products${qs}`, {
     method: 'GET',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
   })
 }
 
-export function buildDataProduct({ apiKey, orgId, type, restaurantId, policyOverrides } = {}) {
+export function buildDataProduct({ apiKey, orgId, roles, type, restaurantId, policyOverrides } = {}) {
   return request('/data-products/build', {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: {
       type,
       restaurantId,
@@ -159,25 +164,25 @@ export function buildDataProduct({ apiKey, orgId, type, restaurantId, policyOver
   })
 }
 
-export function publishProduct({ apiKey, orgId, space, productId } = {}) {
+export function publishProduct({ apiKey, orgId, roles, space, productId } = {}) {
   const mapped = mapSpace(space)
   return request(`/publish/${mapped}`, {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: { productId },
   })
 }
 
-export function consumeProduct({ apiKey, orgId, space, productId, purpose } = {}) {
+export function consumeProduct({ apiKey, orgId, roles, space, productId, purpose } = {}) {
   const mapped = mapSpace(space)
   return request(`/consume/${mapped}/${productId}`, {
     method: 'POST',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
     body: { purpose },
   })
 }
 
-export function listAuditLogs({ apiKey, orgId, action, productId, space, since } = {}) {
+export function listAuditLogs({ apiKey, orgId, roles, action, productId, space, since } = {}) {
   const params = new URLSearchParams()
   if (action) params.set('action', action)
   if (productId) params.set('productId', productId)
@@ -187,7 +192,7 @@ export function listAuditLogs({ apiKey, orgId, action, productId, space, since }
 
   return request(`/audit/logs${qs}`, {
     method: 'GET',
-    headers: buildHeaders({ apiKey, orgId }),
+    headers: buildHeaders({ apiKey, orgId, roles }),
   })
 }
 

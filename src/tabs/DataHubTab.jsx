@@ -28,6 +28,8 @@ export default function DataHubTab({ editorState }) {
   const [restaurantId, setRestaurantId] = useState('resto-1')
   const [currency, setCurrency] = useState('EUR')
 
+  const [rolesSelected, setRolesSelected] = useState(['restaurant'])
+
   const [dataProducts, setDataProducts] = useState([])
   const [selectedDataProduct, setSelectedDataProduct] = useState(null)
   const [dataProductsFilters, setDataProductsFilters] = useState({
@@ -153,6 +155,19 @@ export default function DataHubTab({ editorState }) {
     setActionLog((prev) => [entry, ...prev].slice(0, 50))
   }
 
+  function setSingleRole(role) {
+    setRolesSelected([role])
+  }
+
+  function toggleRole(role) {
+    setRolesSelected((prev) => {
+      const set = new Set(prev)
+      if (set.has(role)) set.delete(role)
+      else set.add(role)
+      return Array.from(set)
+    })
+  }
+
   function onAuditAutofillFromSelected() {
     setAuditFilters((prev) => ({
       ...prev,
@@ -175,6 +190,7 @@ export default function DataHubTab({ editorState }) {
       const res = await listAuditLogs({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         action,
         space,
         productId,
@@ -213,6 +229,7 @@ export default function DataHubTab({ editorState }) {
       const res = await consumeProduct({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         space: publishSpace,
         productId,
         purpose: consumePurpose,
@@ -235,7 +252,7 @@ export default function DataHubTab({ editorState }) {
     setStorageView(null)
     setLoading((prev) => ({ ...prev, viewStaging: true }))
     try {
-      const res = await debugStaging({ apiKey, orgId: orgId || undefined, source })
+      const res = await debugStaging({ apiKey, orgId: orgId || undefined, roles: rolesSelected, source })
       setStorageView({
         kind: 'staging',
         label: `Staging (${source})`,
@@ -270,6 +287,7 @@ export default function DataHubTab({ editorState }) {
       const res = await publishProduct({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         space: publishSpace,
         productId,
       })
@@ -331,6 +349,7 @@ export default function DataHubTab({ editorState }) {
       const res = await buildDataProduct({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         type: buildType,
         restaurantId: restaurantIdValue,
         policyOverrides,
@@ -357,6 +376,7 @@ export default function DataHubTab({ editorState }) {
       const res = await debugNormalized({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         type,
         restaurantId: restaurantId || undefined,
       })
@@ -412,13 +432,14 @@ export default function DataHubTab({ editorState }) {
       const rid = restaurantId || dataProductsFilters.restaurantId || undefined
 
       setPublishSpace(demoSpace)
+
+      const headers = { apiKey, orgId: orgId || undefined, roles: rolesSelected }
       setConsumePurpose('discovery')
       stepLog('Data-space demo (menu): start', 'running')
 
-      const build = await runTimedStep('Build data product (menu)', async () => {
+      const build = await runTimedStep('Build data product', async () => {
         return buildDataProduct({
-          apiKey,
-          orgId: orgId || undefined,
+          ...headers,
           type: 'menu',
           restaurantId: rid,
         })
@@ -432,8 +453,7 @@ export default function DataHubTab({ editorState }) {
 
       const publish = await runTimedStep(`Publish to ${demoSpace}`, async () => {
         return publishProduct({
-          apiKey,
-          orgId: orgId || undefined,
+          ...headers,
           space: demoSpace,
           productId: product.id,
         })
@@ -449,25 +469,23 @@ export default function DataHubTab({ editorState }) {
         },
       }))
 
-      const allowConsume = await runTimedStep('Consume (discovery)', async () => {
+      const consumeAllow = await runTimedStep('Consume (allow)', async () => {
         return consumeProduct({
-          apiKey,
-          orgId: orgId || undefined,
+          ...headers,
           space: demoSpace,
           productId: product.id,
           purpose: 'discovery',
         })
       })
 
-      setConsumeResult(allowConsume.res)
-      setLastResponse(allowConsume.res)
+      setConsumeResult(consumeAllow.res)
+      setLastResponse(consumeAllow.res)
 
-      const denyConsume = await runTimedStep(
-        'Consume (ads-targeting)',
+      const consumeDeny = await runTimedStep(
+        'Consume (deny)',
         async () => {
           return consumeProduct({
-            apiKey,
-            orgId: orgId || undefined,
+            ...headers,
             space: demoSpace,
             productId: product.id,
             purpose: 'ads-targeting',
@@ -476,9 +494,9 @@ export default function DataHubTab({ editorState }) {
         { allow403: true },
       )
 
-      if (denyConsume.denied) {
-        setConsumeError(denyConsume.err)
-        setLastError(denyConsume.err)
+      if (consumeDeny.denied) {
+        setConsumeError(consumeDeny.err)
+        setLastError(consumeDeny.err)
       }
 
       setAuditFilters((prev) => ({
@@ -507,6 +525,7 @@ export default function DataHubTab({ editorState }) {
       const res = await listDataProducts({
         apiKey,
         orgId: orgId || undefined,
+        roles: rolesSelected,
         type,
         restaurantId: dataProductsFilters.restaurantId || undefined,
       })
@@ -545,7 +564,7 @@ export default function DataHubTab({ editorState }) {
     setLoading((prev) => ({ ...prev, demo: true }))
 
     try {
-      const headers = { apiKey, orgId: orgId || undefined }
+      const headers = { apiKey, orgId: orgId || undefined, roles: rolesSelected }
 
       stepLog('Demo: ingest menu', 'running')
       const menuPayload = mapEditorStateToMenuIngest({
@@ -680,6 +699,45 @@ export default function DataHubTab({ editorState }) {
               autoComplete="off"
             />
           </Field>
+
+          <Field label="Roles">
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <ActionButton
+                  onClick={() => setSingleRole('restaurant')}
+                  className="border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Perfil Restaurante
+                </ActionButton>
+                <ActionButton
+                  onClick={() => setSingleRole('destination')}
+                  className="border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Perfil Destino
+                </ActionButton>
+                <ActionButton
+                  onClick={() => setSingleRole('marketplace')}
+                  className="border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Perfil Marketplace
+                </ActionButton>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {['restaurant', 'destination', 'marketplace', 'admin'].map((role) => (
+                  <label key={role} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={rolesSelected.includes(role)}
+                      onChange={() => toggleRole(role)}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-slate-700">{role}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </Field>
         </div>
       </Card>
 
@@ -693,7 +751,9 @@ export default function DataHubTab({ editorState }) {
         <div className="text-sm font-semibold text-slate-800 mb-4">Acciones</div>
         <div className="flex flex-wrap gap-2">
           <ActionButton
-            onClick={() => runAction('Health', 'health', () => health({ apiKey, orgId: orgId || undefined }))}
+            onClick={() =>
+              runAction('Health', 'health', () => health({ apiKey, orgId: orgId || undefined, roles: rolesSelected }))
+            }
             disabled={missingApiKey}
             loading={loading.health}
             loadingText="Cargando…"
@@ -712,7 +772,7 @@ export default function DataHubTab({ editorState }) {
                   currency,
                 })
 
-                return ingestMenu(payload, { apiKey, orgId: orgId || undefined })
+                return ingestMenu(payload, { apiKey, orgId: orgId || undefined, roles: rolesSelected })
               })
             }
             disabled={missingApiKey}
@@ -747,7 +807,7 @@ export default function DataHubTab({ editorState }) {
                   ],
                 }
 
-                return ingestOccupancy(payload, { apiKey, orgId: orgId || undefined })
+                return ingestOccupancy(payload, { apiKey, orgId: orgId || undefined, roles: rolesSelected })
               })
             }
             disabled={missingApiKey}
@@ -761,7 +821,9 @@ export default function DataHubTab({ editorState }) {
 
           <ActionButton
             onClick={() =>
-              runAction('Normalize', 'normalize', () => normalizeRun({ apiKey, orgId: orgId || undefined }))
+              runAction('Normalize', 'normalize', () =>
+                normalizeRun({ apiKey, orgId: orgId || undefined, roles: rolesSelected }),
+              )
             }
             disabled={missingApiKey}
             loading={loading.normalize}
