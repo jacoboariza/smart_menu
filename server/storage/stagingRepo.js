@@ -16,6 +16,7 @@ async function ensureDataFile() {
 }
 
 async function safeWriteJson(data) {
+  await fs.mkdir(DATA_DIR, { recursive: true })
   const payload = JSON.stringify(data, null, 2)
   await fs.writeFile(TMP_FILE, payload, 'utf8')
   await fs.rename(TMP_FILE, STAGING_FILE)

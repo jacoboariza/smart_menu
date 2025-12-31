@@ -6,10 +6,13 @@ import {
   listMenuItems,
   listOccupancySignals,
 } from '../../server/storage/normalizedRepo.js'
-import { getById as getDataProduct } from '../../server/storage/dataProductRepo.js'
+import { getById as getDataProduct, list as listDataProducts, upsert as upsertDataProduct } from '../../server/storage/dataProductRepo.js'
 import { list as listAudit } from '../../server/storage/auditRepo.js'
 import { segitturAdapter } from '../../server/adapters/SegitturAdapterMock.js'
 import { gaiaXAdapter } from '../../server/adapters/GaiaXAdapterMock.js'
+import { buildMenuProduct } from '../../server/products/buildMenuProduct.js'
+import { buildOccupancyProduct } from '../../server/products/buildOccupancyProduct.js'
+import { validateDataProduct } from '../../server/domain/dataProduct.js'
 
 function buildResponse(statusCode, body) {
   return {
@@ -110,6 +113,16 @@ function isDebugNormalized(path) {
   return normalized.endsWith('/debug/normalized') || normalized.includes('/debug/normalized')
 }
 
+function isDataProducts(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/data-products') || normalized.includes('/data-products')
+}
+
+function isDataProductsBuild(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/data-products/build') || normalized.includes('/data-products/build')
+}
+
 export async function handler(event, context) {
   const method = event.httpMethod
   const path = event.path || ''
@@ -190,6 +203,32 @@ export async function handler(event, context) {
       }
     }
 
+    // GET /data-products?type=menu|occupancy&restaurantId=...
+    if (isDataProducts(path) && !isDataProductsBuild(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const type = params.type
+        const restaurantId = params.restaurantId
+
+        if (type && type !== 'menu' && type !== 'occupancy') {
+          return buildResponse(404, {
+            error: {
+              code: 'unknown_type',
+              message: "type must be 'menu' or 'occupancy'",
+            },
+          })
+        }
+
+        let products = await listDataProducts()
+        if (type) products = products.filter((p) => p.type === type)
+        if (restaurantId) products = products.filter((p) => p?.metadata?.restaurantId === restaurantId)
+
+        return buildResponse(200, { products })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'data_products_error', message: err.message } })
+      }
+    }
+
     return buildResponse(404, { error: { code: 'not_found', message: 'Endpoint not found' } })
   }
 
@@ -222,6 +261,52 @@ export async function handler(event, context) {
   const rolesHeader = event.headers?.['x-roles'] || event.headers?.['X-Roles'] || ''
   const roles = rolesHeader ? rolesHeader.split(',').map((r) => r.trim()) : []
   const actor = { orgId: orgId || 'anonymous', roles }
+
+  // POST /data-products/build
+  if (isDataProductsBuild(path)) {
+    const { type, restaurantId, policyOverrides } = body || {}
+
+    if (type !== 'menu' && type !== 'occupancy') {
+      return buildResponse(404, {
+        error: {
+          code: 'unknown_type',
+          message: "type must be 'menu' or 'occupancy'",
+        },
+      })
+    }
+
+    if (!restaurantId || typeof restaurantId !== 'string') {
+      return buildResponse(400, {
+        error: {
+          code: 'validation_error',
+          message: 'restaurantId required',
+        },
+      })
+    }
+
+    try {
+      const identity = { orgId: actor.orgId, roles: actor.roles }
+      const product =
+        type === 'menu'
+          ? await buildMenuProduct({ restaurantId, identity, policyOverrides })
+          : await buildOccupancyProduct({ restaurantId, identity, policyOverrides })
+
+      return buildResponse(200, product)
+    } catch (err) {
+      return buildResponse(500, { error: { code: 'build_data_product_error', message: err.message } })
+    }
+  }
+
+  // POST /data-products (manual upsert)
+  if (isDataProducts(path) && !isDataProductsBuild(path)) {
+    try {
+      const product = validateDataProduct(body)
+      await upsertDataProduct(product)
+      return buildResponse(200, { id: product.id })
+    } catch (err) {
+      return buildResponse(400, { error: { code: 'validation_error', message: err.message } })
+    }
+  }
 
   // POST /publish/:space
   const publishSpace = parsePublishSpace(path)
