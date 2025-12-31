@@ -1092,8 +1092,8 @@ export default function DataHubTab({ editorState }) {
                 value={publishSpace}
                 onChange={(e) => setPublishSpace(e.target.value)}
               >
-                <option value="segittur-mock">segittur-mock</option>
-                <option value="gaiax-mock">gaiax-mock</option>
+                <option value="segittur-mock">SEGITTUR (mock)</option>
+                <option value="gaiax-mock">GAIA-X (mock)</option>
               </select>
             </div>
 
@@ -1158,8 +1158,8 @@ export default function DataHubTab({ editorState }) {
                 value={publishSpace}
                 onChange={(e) => setPublishSpace(e.target.value)}
               >
-                <option value="segittur-mock">segittur-mock</option>
-                <option value="gaiax-mock">gaiax-mock</option>
+                <option value="segittur-mock">SEGITTUR (mock)</option>
+                <option value="gaiax-mock">GAIA-X (mock)</option>
               </select>
             </div>
 
@@ -1257,8 +1257,8 @@ export default function DataHubTab({ editorState }) {
               onChange={(e) => setAuditFilters((prev) => ({ ...prev, space: e.target.value }))}
             >
               <option value="all">all</option>
-              <option value="segittur-mock">segittur-mock</option>
-              <option value="gaiax-mock">gaiax-mock</option>
+              <option value="segittur-mock">SEGITTUR (mock)</option>
+              <option value="gaiax-mock">GAIA-X (mock)</option>
             </select>
           </div>
 

@@ -62,6 +62,33 @@ function isAuditLogs(path) {
   return normalized.endsWith('/audit/logs') || normalized.includes('/audit/logs')
 }
 
+export function normalizeSpace(space) {
+  if (typeof space !== 'string') {
+    return { ok: false, statusCode: 400, error: { code: 'invalid_space', message: 'space must be a string' } }
+  }
+
+  const normalized = space.trim().toLowerCase()
+  if (!normalized) {
+    return { ok: false, statusCode: 400, error: { code: 'invalid_space', message: 'space must be a non-empty string' } }
+  }
+
+  if (normalized === 'segittur' || normalized === 'segittur-mock') {
+    return { ok: true, space: 'segittur' }
+  }
+  if (normalized === 'gaiax' || normalized === 'gaiax-mock') {
+    return { ok: true, space: 'gaiax' }
+  }
+
+  return {
+    ok: false,
+    statusCode: 404,
+    error: {
+      code: 'space_not_found',
+      message: `Space '${space}' not supported`,
+    },
+  }
+}
+
 function getAdapterForSpace(space) {
   if (space === 'segittur') return segitturAdapter
   if (space === 'gaiax') return gaiaXAdapter
@@ -102,7 +129,13 @@ export async function handler(event, context) {
         const filters = {}
         if (params.action) filters.action = params.action
         if (params.productId) filters.productId = params.productId
-        if (params.space) filters.space = params.space
+        if (params.space) {
+          const normalizedSpace = normalizeSpace(params.space)
+          if (!normalizedSpace.ok) {
+            return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+          }
+          filters.space = normalizedSpace.space
+        }
         if (params.since) filters.since = params.since
 
         const logs = await listAudit(filters)
@@ -193,9 +226,14 @@ export async function handler(event, context) {
   // POST /publish/:space
   const publishSpace = parsePublishSpace(path)
   if (publishSpace) {
-    const adapter = getAdapterForSpace(publishSpace)
+    const normalizedSpace = normalizeSpace(publishSpace)
+    if (!normalizedSpace.ok) {
+      return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+    }
+
+    const adapter = getAdapterForSpace(normalizedSpace.space)
     if (!adapter) {
-      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${publishSpace}' not supported` } })
+      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${normalizedSpace.space}' not supported` } })
     }
 
     const { productId } = body
@@ -209,8 +247,8 @@ export async function handler(event, context) {
         return buildResponse(404, { error: { code: 'product_not_found', message: 'Data product not found' } })
       }
 
-      const result = await adapter.publish(publishSpace, dataProduct, actor)
-      return buildResponse(200, { space: publishSpace, productId: result.id })
+      const result = await adapter.publish(normalizedSpace.space, dataProduct, actor)
+      return buildResponse(200, { space: normalizedSpace.space, productId: result.id })
     } catch (err) {
       return buildResponse(500, { error: { code: 'publish_error', message: err.message } })
     }
@@ -220,9 +258,14 @@ export async function handler(event, context) {
   const consumeParams = parseConsumeParams(path)
   if (consumeParams) {
     const { space, productId } = consumeParams
-    const adapter = getAdapterForSpace(space)
+    const normalizedSpace = normalizeSpace(space)
+    if (!normalizedSpace.ok) {
+      return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+    }
+
+    const adapter = getAdapterForSpace(normalizedSpace.space)
     if (!adapter) {
-      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${space}' not supported` } })
+      return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${normalizedSpace.space}' not supported` } })
     }
 
     const { purpose } = body
@@ -231,7 +274,7 @@ export async function handler(event, context) {
     }
 
     try {
-      const result = await adapter.consume(space, productId, actor, purpose)
+      const result = await adapter.consume(normalizedSpace.space, productId, actor, purpose)
 
       if (result.denied) {
         return buildResponse(403, { error: { code: 'access_denied', message: result.reason } })
