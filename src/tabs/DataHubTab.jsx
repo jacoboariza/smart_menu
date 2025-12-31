@@ -427,19 +427,24 @@ export default function DataHubTab({ editorState }) {
     setBuildError(null)
     setDataSpaceDemoLoading(true)
 
+    const prevRoles = rolesSelected
+
     try {
       const demoSpace = 'segittur-mock'
       const rid = restaurantId || dataProductsFilters.restaurantId || undefined
 
       setPublishSpace(demoSpace)
 
-      const headers = { apiKey, orgId: orgId || undefined, roles: rolesSelected }
+      // Paso A (restaurante)
+      setRolesSelected(['restaurant'])
+      const restaurantHeaders = { apiKey, orgId: orgId || undefined, roles: ['restaurant'] }
+
       setConsumePurpose('discovery')
       stepLog('Data-space demo (menu): start', 'running')
 
       const build = await runTimedStep('Build data product', async () => {
         return buildDataProduct({
-          ...headers,
+          ...restaurantHeaders,
           type: 'menu',
           restaurantId: rid,
         })
@@ -453,7 +458,7 @@ export default function DataHubTab({ editorState }) {
 
       const publish = await runTimedStep(`Publish to ${demoSpace}`, async () => {
         return publishProduct({
-          ...headers,
+          ...restaurantHeaders,
           space: demoSpace,
           productId: product.id,
         })
@@ -469,9 +474,13 @@ export default function DataHubTab({ editorState }) {
         },
       }))
 
+      // Paso B (destino)
+      setRolesSelected(['destination'])
+      const destinationHeaders = { apiKey, orgId: orgId || undefined, roles: ['destination'] }
+
       const consumeAllow = await runTimedStep('Consume (allow)', async () => {
         return consumeProduct({
-          ...headers,
+          ...destinationHeaders,
           space: demoSpace,
           productId: product.id,
           purpose: 'discovery',
@@ -485,7 +494,7 @@ export default function DataHubTab({ editorState }) {
         'Consume (deny)',
         async () => {
           return consumeProduct({
-            ...headers,
+            ...destinationHeaders,
             space: demoSpace,
             productId: product.id,
             purpose: 'ads-targeting',
@@ -513,6 +522,7 @@ export default function DataHubTab({ editorState }) {
       setLastError(err)
       stepLog('Data-space demo (menu): aborted', 'error')
     } finally {
+      setRolesSelected(prevRoles)
       setDataSpaceDemoLoading(false)
     }
   }
