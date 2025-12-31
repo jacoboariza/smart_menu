@@ -149,7 +149,19 @@ export async function handler(event, context) {
           }
           filters.space = normalizedSpace.space
         }
-        if (params.since) filters.since = params.since
+        if (params.since) {
+          const sinceStr = String(params.since)
+          const sinceMs = Date.parse(sinceStr)
+          if (Number.isNaN(sinceMs)) {
+            return buildResponse(400, {
+              error: {
+                code: 'validation_error',
+                message: 'since must be a valid ISO date string',
+              },
+            })
+          }
+          filters.since = new Date(sinceMs).toISOString()
+        }
 
         const logs = await listAudit(filters)
         return buildResponse(200, { logs })

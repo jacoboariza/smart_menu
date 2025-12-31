@@ -1368,7 +1368,7 @@ export default function DataHubTab({ editorState }) {
                   <div
                     key={`${ts}-${idx}`}
                     className={`rounded-lg border px-3 py-2 ${
-                      isDenied ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'
+                      isDenied ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -1379,7 +1379,7 @@ export default function DataHubTab({ editorState }) {
                       {decision ? (
                         <div
                           className={`text-xs font-semibold ${
-                            isDenied ? 'text-amber-800' : 'text-emerald-700'
+                            isDenied ? 'text-red-800' : 'text-emerald-700'
                           }`}
                         >
                           {isDenied ? 'DENY' : decision.toUpperCase()}
@@ -1392,7 +1392,9 @@ export default function DataHubTab({ editorState }) {
                       {space ? <span className="text-slate-500"> — {space}</span> : null}
                     </div>
 
-                    {reason ? <div className="mt-1 text-sm text-slate-700">{reason}</div> : null}
+                    {reason ? (
+                      <div className={`mt-1 text-sm ${isDenied ? 'text-red-800' : 'text-slate-700'}`}>{reason}</div>
+                    ) : null}
                   </div>
                 )
               })}

@@ -15,8 +15,26 @@ async function ensureFile() {
 }
 
 async function safeWriteJson(data) {
+  await fs.mkdir(DATA_DIR, { recursive: true })
   const payload = JSON.stringify(data, null, 2)
   await fs.writeFile(TMP_FILE, payload, 'utf8')
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await fs.rename(TMP_FILE, FILE)
+      return
+    } catch (err) {
+      const code = err?.code
+      if (code !== 'EPERM' && code !== 'EEXIST') throw err
+
+      try {
+        await fs.unlink(FILE)
+      } catch {}
+
+      await new Promise((r) => setTimeout(r, 10 * (attempt + 1)))
+    }
+  }
+
   await fs.rename(TMP_FILE, FILE)
 }
 
@@ -65,7 +83,12 @@ export async function list(filters = {}) {
     records = records.filter((r) => r.space === filters.space)
   }
   if (filters.since) {
-    records = records.filter((r) => r.ts >= filters.since)
+    const sinceMs = Date.parse(filters.since)
+    records = records.filter((r) => {
+      const tsMs = Date.parse(r.ts)
+      if (Number.isNaN(tsMs)) return false
+      return tsMs >= sinceMs
+    })
   }
 
   return records

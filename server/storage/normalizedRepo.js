@@ -19,8 +19,26 @@ async function ensureFiles() {
 }
 
 async function safeWrite(file, tmp, data) {
+  await fs.mkdir(DATA_DIR, { recursive: true })
   const payload = JSON.stringify(data, null, 2)
   await fs.writeFile(tmp, payload, 'utf8')
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await fs.rename(tmp, file)
+      return
+    } catch (err) {
+      const code = err?.code
+      if (code !== 'EPERM' && code !== 'EEXIST') throw err
+
+      try {
+        await fs.unlink(file)
+      } catch {}
+
+      await new Promise((r) => setTimeout(r, 10 * (attempt + 1)))
+    }
+  }
+
   await fs.rename(tmp, file)
 }
 
