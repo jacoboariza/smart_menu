@@ -36,6 +36,7 @@ import EditorTab from './tabs/EditorTab.jsx'
 import JsonTab from './tabs/JsonTab.jsx'
 import PreviewTab from './tabs/PreviewTab.jsx'
 import DataHubTab from './tabs/DataHubTab.jsx'
+import AyuntamientosTab from './tabs/AyuntamientosTab.jsx'
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -1007,6 +1008,19 @@ ${jsonLdString}
             <Database className="h-4 w-4" />
             Data Hub
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('ayuntamientos')}
+            className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+              activeTab === 'ayuntamientos'
+                ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Globe className="h-4 w-4" />
+            Para Ayuntamientos
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-200 absolute bottom-0 left-0 right-0">
@@ -1104,6 +1118,8 @@ ${jsonLdString}
         )}
 
         {activeTab === 'datahub' && <DataHubTab editorState={{ sections }} />}
+
+        {activeTab === 'ayuntamientos' && <AyuntamientosTab />}
       </main>
 
       {showPdfModal && (
