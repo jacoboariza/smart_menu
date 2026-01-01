@@ -218,6 +218,41 @@ export default function AyuntamientoPortalTab() {
 
   const loadingAny = loading.menu || loading.occupancy || loading.products || loading.audit
 
+  function occupancyLevel(pct) {
+    if (typeof pct !== 'number') return null
+    if (pct < 35) return { label: 'Baja', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
+    if (pct < 70) return { label: 'Media', className: 'border-amber-200 bg-amber-50 text-amber-800' }
+    return { label: 'Alta', className: 'border-rose-200 bg-rose-50 text-rose-700' }
+  }
+
+  const restaurantAllergens = useMemo(() => {
+    const map = new Map()
+    for (const it of menuItems) {
+      const rid = it?.restaurantId
+      if (!rid) continue
+      const set = map.get(rid) || new Set()
+      const list = Array.isArray(it?.allergens) ? it.allergens : []
+      list.forEach((a) => {
+        const v = String(a || '').trim()
+        if (v) set.add(v)
+      })
+      map.set(rid, set)
+    }
+    return map
+  }, [menuItems])
+
+  const openNowRestaurants = useMemo(() => {
+    const now = Date.now()
+    const recent = restaurants.filter((r) => r.latestOccupancyAtMs && now - r.latestOccupancyAtMs <= 2 * 60 * 60 * 1000)
+    if (recent.length > 0) return recent
+    // Si no tenemos horarios (ni señales recientes), no filtramos por horario
+    return restaurants
+  }, [restaurants])
+
+  const glutenFreeRestaurants = useMemo(() => {
+    return restaurants.filter((r) => r.glutenFree)
+  }, [restaurants])
+
   async function runDemoLoad() {
     const profile = 'municipality'
     const now = Date.now()
@@ -627,75 +662,137 @@ export default function AyuntamientoPortalTab() {
 
       {activeSubtab === 'ciudadano' && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
-                  <Users className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-800 text-sm">Buscador municipal</h3>
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed flex-1">
-                Restaurantes abiertos, filtros por alergias y opciones dietéticas sin depender de plataformas privadas.
-              </p>
-              <button
-                type="button"
-                className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
-              >
-                Ver prototipo
-              </button>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                  <LifeBuoy className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-800 text-sm">Atención al visitante</h3>
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed flex-1">
-                Recomendaciones por zona, eventos y accesibilidad con información oficial.
-              </p>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-                Listo para integrarse en la web del municipio.
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
-                  <Settings2 className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-800 text-sm">Integraciones</h3>
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed flex-1">
-                Conecta con turismo, open data o apps municipales sin exponer APIs complejas.
-              </p>
-              <button
-                type="button"
-                className="w-full rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition-colors"
-              >
-                Solicitar integración
-              </button>
-            </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Servicios al ciudadano</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Información clara para ayudarte a elegir dónde comer, con datos del municipio.
+            </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Catálogo de servicios</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { title: 'Restaurantes por barrio', subtitle: 'Listado oficial con horarios y contacto' },
-                { title: 'Filtro sin gluten', subtitle: 'Opciones señalizadas por restaurante y plato' },
-                { title: 'Recomendaciones familiares', subtitle: 'Accesibilidad, menús infantiles y aforo' },
-                { title: 'Mapa de restauración', subtitle: 'Puntos de interés y rutas gastronómicas' },
-              ].map((s) => (
-                <div key={s.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-900">{s.title}</div>
-                  <div className="text-xs text-slate-600 mt-1">{s.subtitle}</div>
+          {loadingAny ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="h-4 w-56 bg-slate-200 rounded mb-2 animate-pulse" />
+                  <div className="h-3 w-72 bg-slate-200 rounded animate-pulse" />
                 </div>
               ))}
             </div>
-          </div>
+          ) : restaurants.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
+              <div className="text-sm font-semibold text-slate-900">Aún no hay restaurantes para mostrar</div>
+              <div className="text-sm text-slate-600 mt-1">Puedes cargar una demo para ver el servicio en funcionamiento.</div>
+              <button
+                type="button"
+                onClick={runDemoLoad}
+                disabled={loading.demo}
+                className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
+              >
+                {loading.demo ? 'Ejecutando…' : 'Ejecutar demo de carga'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Dónde comer ahora</h3>
+                    <p className="text-sm text-slate-600 mt-1">Restaurantes con información de ocupación reciente.</p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-50 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
+                    <Clock className="h-4 w-4" />
+                    Actualización automática
+                  </span>
+                </div>
+
+                <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  {openNowRestaurants.slice(0, 12).map((r) => {
+                    const level = occupancyLevel(r.latestOccupancyPct)
+                    return (
+                      <div key={r.id} className="p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">{r.name}</div>
+                          <div className="text-xs text-slate-500">
+                            Cocina: <span className="text-slate-700">{r.cuisineLabel || '—'}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {level ? (
+                            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${level.className}`}>
+                              Ocupación {level.label}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                              Ocupación: —
+                            </span>
+                          )}
+                          {r.glutenFree && (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                              Sin gluten
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {openNowRestaurants.length > 12 && (
+                  <div className="mt-3 text-xs text-slate-500">Mostrando 12 de {openNowRestaurants.length}.</div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Opciones sin gluten</h3>
+                    <p className="text-sm text-slate-600 mt-1">Restaurantes con platos marcados como sin gluten.</p>
+                  </div>
+                </div>
+
+                {glutenFreeRestaurants.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+                    No hay opciones sin gluten registradas por ahora.
+                  </div>
+                ) : (
+                  <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    {glutenFreeRestaurants.slice(0, 12).map((r) => {
+                      const allergens = Array.from(restaurantAllergens.get(r.id) || []).slice(0, 4)
+                      return (
+                        <div key={r.id} className="p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{r.name}</div>
+                            <div className="text-xs text-slate-500">
+                              Cocina: <span className="text-slate-700">{r.cuisineLabel || '—'}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                              Sin gluten
+                            </span>
+                            {allergens.length > 0 ? (
+                              allergens.map((a) => (
+                                <span
+                                  key={a}
+                                  className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+                                >
+                                  {a}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                                Alérgenos: —
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
