@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, Building2, FileCheck2, LifeBuoy, Settings2, ShieldCheck, Users } from 'lucide-react'
+import { listAuditLogs, listDataProducts, toUserError } from '../lib/apiClient.js'
 
 const SUBTABS = [
   { id: 'gestion', label: 'Gestión', icon: Settings2 },
@@ -9,7 +10,48 @@ const SUBTABS = [
 export default function AyuntamientoPortalTab() {
   const [activeSubtab, setActiveSubtab] = useState('gestion')
 
+  const [loading, setLoading] = useState({ products: false, audit: false })
+  const [errors, setErrors] = useState({ products: null, audit: null })
+  const [products, setProducts] = useState([])
+  const [auditLogs, setAuditLogs] = useState([])
+
   const current = useMemo(() => SUBTABS.find((t) => t.id === activeSubtab) || SUBTABS[0], [activeSubtab])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setLoading((p) => ({ ...p, products: true }))
+      setErrors((e) => ({ ...e, products: null }))
+      try {
+        const res = await listDataProducts({ profile: 'municipality' })
+        const list = Array.isArray(res?.products) ? res.products : Array.isArray(res) ? res : []
+        if (!cancelled) setProducts(list)
+      } catch (err) {
+        if (!cancelled) setErrors((e) => ({ ...e, products: err }))
+      } finally {
+        if (!cancelled) setLoading((p) => ({ ...p, products: false }))
+      }
+
+      setLoading((p) => ({ ...p, audit: true }))
+      setErrors((e) => ({ ...e, audit: null }))
+      try {
+        const res = await listAuditLogs({ profile: 'municipality' })
+        const list = Array.isArray(res?.logs) ? res.logs : Array.isArray(res) ? res : []
+        if (!cancelled) setAuditLogs(list.slice(-10).reverse())
+      } catch (err) {
+        if (!cancelled) setErrors((e) => ({ ...e, audit: err }))
+      } finally {
+        if (!cancelled) setLoading((p) => ({ ...p, audit: false }))
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -67,6 +109,40 @@ export default function AyuntamientoPortalTab() {
 
       {activeSubtab === 'gestion' && (
         <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Catálogo municipal</div>
+                  <div className="text-xs text-slate-500">Resumen (modo demo)</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-500">Data products</div>
+                  <div className="text-2xl font-bold text-slate-900">{loading.products ? '—' : products.length}</div>
+                </div>
+              </div>
+              {errors.products && (
+                <div className="mt-3 text-xs text-red-700">{toUserError(errors.products)}</div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Trazabilidad</div>
+                  <div className="text-xs text-slate-500">Últimos eventos (modo demo)</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-500">Eventos</div>
+                  <div className="text-2xl font-bold text-slate-900">{loading.audit ? '—' : auditLogs.length}</div>
+                </div>
+              </div>
+              {errors.audit && (
+                <div className="mt-3 text-xs text-red-700">{toUserError(errors.audit)}</div>
+              )}
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col gap-3">
               <div className="flex items-center gap-3">
