@@ -441,6 +441,60 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
         </div>
       </div>
 
+      {demoModeEnabled && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                <LifeBuoy className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Preparar demo con datos</div>
+                <div className="text-sm text-slate-600 mt-1">
+                  Carga un ejemplo completo para ver KPIs, catálogo y servicios al ciudadano.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={prepareMunicipalityDemo}
+              disabled={demoRunning}
+              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
+            >
+              {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
+            </button>
+          </div>
+
+          {demoError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+              No se pudo preparar la demo. {toUserError(demoError)}
+            </div>
+          )}
+
+          {demoSteps.length > 0 && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold text-slate-700">PROGRESO</div>
+              <div className="mt-2 space-y-2">
+                {demoSteps.map((s, idx) => (
+                  <div key={`${s.ts}-${idx}`} className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-slate-800">{s.text}</div>
+                    <div className="text-xs font-semibold">
+                      {s.status === 'ok' ? (
+                        <span className="text-emerald-700">OK</span>
+                      ) : s.status === 'error' ? (
+                        <span className="text-red-700">Error</span>
+                      ) : (
+                        <span className="text-slate-500">En curso</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeSubtab === 'gestion' && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -571,14 +625,16 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
                   <div className="text-sm text-slate-600 mt-1">
                     Para ver el portal funcionando, puedes cargar una demo con datos de ejemplo.
                   </div>
-                  <button
-                    type="button"
-                    onClick={demoModeEnabled ? prepareMunicipalityDemo : undefined}
-                    disabled={!demoModeEnabled || demoRunning}
-                    className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
-                  >
-                    {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
-                  </button>
+                  {demoModeEnabled && (
+                    <button
+                      type="button"
+                      onClick={prepareMunicipalityDemo}
+                      disabled={demoRunning}
+                      className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
+                    >
+                      {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -730,14 +786,16 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
               <div className="text-sm font-semibold text-slate-900">Aún no hay restaurantes para mostrar</div>
               <div className="text-sm text-slate-600 mt-1">Puedes cargar una demo para ver el servicio en funcionamiento.</div>
-              <button
-                type="button"
-                onClick={demoModeEnabled ? prepareMunicipalityDemo : undefined}
-                disabled={!demoModeEnabled || demoRunning}
-                className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
-              >
-                {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
-              </button>
+              {demoModeEnabled && (
+                <button
+                  type="button"
+                  onClick={prepareMunicipalityDemo}
+                  disabled={demoRunning}
+                  className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
+                >
+                  {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
+                </button>
+              )}
             </div>
           ) : (
             <>
