@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, FileCheck2, LifeBuoy, Settings2, ShieldCheck, Users } from 'lucide-react'
-import { listAuditLogs, listDataProducts, toUserError } from '../lib/apiClient.js'
+import { BarChart3, Building2, Clock, FileCheck2, LifeBuoy, Search, Settings2, ShieldCheck, Users } from 'lucide-react'
+import {
+  buildDataProduct,
+  consumeProduct,
+  debugNormalized,
+  ingestMenu,
+  ingestOccupancy,
+  listAuditLogs,
+  listDataProducts,
+  normalizeRun,
+  publishProduct,
+  toUserError,
+} from '../lib/apiClient.js'
 
 const SUBTABS = [
   { id: 'gestion', label: 'Gestión', icon: Settings2 },
@@ -10,48 +21,282 @@ const SUBTABS = [
 export default function AyuntamientoPortalTab() {
   const [activeSubtab, setActiveSubtab] = useState('gestion')
 
-  const [loading, setLoading] = useState({ products: false, audit: false })
-  const [errors, setErrors] = useState({ products: null, audit: null })
+  const [loading, setLoading] = useState({
+    menu: false,
+    occupancy: false,
+    products: false,
+    audit: false,
+    demo: false,
+  })
+  const [errors, setErrors] = useState({ menu: null, occupancy: null, products: null, audit: null, demo: null })
+
+  const [menuItems, setMenuItems] = useState([])
+  const [occupancySignals, setOccupancySignals] = useState([])
   const [products, setProducts] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
 
+  const [query, setQuery] = useState('')
+  const [filters, setFilters] = useState({ openNow: false, glutenFree: false, hasAllergens: false })
+
   const current = useMemo(() => SUBTABS.find((t) => t.id === activeSubtab) || SUBTABS[0], [activeSubtab])
 
+  async function refreshData({ sinceIso } = {}) {
+    const profile = 'municipality'
+
+    setLoading((p) => ({ ...p, menu: true }))
+    setErrors((e) => ({ ...e, menu: null }))
+    try {
+      const res = await debugNormalized({ type: 'menu', profile })
+      const list = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []
+      setMenuItems(list)
+    } catch (err) {
+      setErrors((e) => ({ ...e, menu: err }))
+    } finally {
+      setLoading((p) => ({ ...p, menu: false }))
+    }
+
+    setLoading((p) => ({ ...p, occupancy: true }))
+    setErrors((e) => ({ ...e, occupancy: null }))
+    try {
+      const res = await debugNormalized({ type: 'occupancy', profile })
+      const list = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []
+      setOccupancySignals(list)
+    } catch (err) {
+      setErrors((e) => ({ ...e, occupancy: err }))
+    } finally {
+      setLoading((p) => ({ ...p, occupancy: false }))
+    }
+
+    setLoading((p) => ({ ...p, products: true }))
+    setErrors((e) => ({ ...e, products: null }))
+    try {
+      const res = await listDataProducts({ profile })
+      const list = Array.isArray(res?.products) ? res.products : Array.isArray(res) ? res : []
+      setProducts(list)
+    } catch (err) {
+      setErrors((e) => ({ ...e, products: err }))
+    } finally {
+      setLoading((p) => ({ ...p, products: false }))
+    }
+
+    setLoading((p) => ({ ...p, audit: true }))
+    setErrors((e) => ({ ...e, audit: null }))
+    try {
+      const res = await listAuditLogs({ profile, since: sinceIso })
+      const list = Array.isArray(res?.logs) ? res.logs : Array.isArray(res) ? res : []
+      setAuditLogs(list)
+    } catch (err) {
+      setErrors((e) => ({ ...e, audit: err }))
+    } finally {
+      setLoading((p) => ({ ...p, audit: false }))
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      setLoading((p) => ({ ...p, products: true }))
-      setErrors((e) => ({ ...e, products: null }))
-      try {
-        const res = await listDataProducts({ profile: 'municipality' })
-        const list = Array.isArray(res?.products) ? res.products : Array.isArray(res) ? res : []
-        if (!cancelled) setProducts(list)
-      } catch (err) {
-        if (!cancelled) setErrors((e) => ({ ...e, products: err }))
-      } finally {
-        if (!cancelled) setLoading((p) => ({ ...p, products: false }))
-      }
-
-      setLoading((p) => ({ ...p, audit: true }))
-      setErrors((e) => ({ ...e, audit: null }))
-      try {
-        const res = await listAuditLogs({ profile: 'municipality' })
-        const list = Array.isArray(res?.logs) ? res.logs : Array.isArray(res) ? res : []
-        if (!cancelled) setAuditLogs(list.slice(-10).reverse())
-      } catch (err) {
-        if (!cancelled) setErrors((e) => ({ ...e, audit: err }))
-      } finally {
-        if (!cancelled) setLoading((p) => ({ ...p, audit: false }))
-      }
-    }
-
-    load()
-
-    return () => {
-      cancelled = true
-    }
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    refreshData({ sinceIso: since })
   }, [])
+
+  function toMs(iso) {
+    const t = Date.parse(iso)
+    return Number.isNaN(t) ? 0 : t
+  }
+
+  function normalizeText(v) {
+    return String(v || '').toLowerCase().trim()
+  }
+
+  function hasAllergens(it) {
+    return Array.isArray(it?.allergens) && it.allergens.length > 0
+  }
+
+  function isGlutenFree(it) {
+    return Boolean(it?.glutenFree)
+  }
+
+  const occupancyLatestByRestaurant = useMemo(() => {
+    const map = new Map()
+    for (const s of occupancySignals) {
+      const rid = s?.restaurantId
+      if (!rid) continue
+      const ms = toMs(s?.ts)
+      const prev = map.get(rid)
+      if (!prev || ms > prev.ms) {
+        map.set(rid, { ms, signal: s })
+      }
+    }
+    return map
+  }, [occupancySignals])
+
+  const restaurants = useMemo(() => {
+    const map = new Map()
+    for (const it of menuItems) {
+      const rid = it?.restaurantId
+      if (!rid) continue
+
+      const current = map.get(rid) || {
+        id: rid,
+        name: rid,
+        cuisines: new Set(),
+        itemsCount: 0,
+        hasAllergens: false,
+        glutenFree: false,
+        updatedAtMs: 0,
+      }
+
+      current.itemsCount += 1
+      current.hasAllergens = current.hasAllergens || hasAllergens(it)
+      current.glutenFree = current.glutenFree || isGlutenFree(it)
+      if (it?.category) current.cuisines.add(String(it.category))
+
+      map.set(rid, current)
+    }
+
+    const productByRestaurant = new Map()
+    for (const p of products) {
+      const rid = p?.metadata?.restaurantId
+      if (!rid) continue
+      const ms = toMs(p?.createdAt)
+      const prev = productByRestaurant.get(rid)
+      if (!prev || ms > prev.createdAtMs) {
+        productByRestaurant.set(rid, { createdAtMs: ms, product: p })
+      }
+    }
+
+    for (const [rid, v] of map.entries()) {
+      const product = productByRestaurant.get(rid)
+      if (product) v.updatedAtMs = product.createdAtMs
+      const occ = occupancyLatestByRestaurant.get(rid)
+      v.latestOccupancyAtMs = occ?.ms || 0
+      v.latestOccupancyPct = occ?.signal?.occupancyPct
+      v.cuisineLabel = Array.from(v.cuisines).slice(0, 2).join(' · ')
+    }
+
+    return Array.from(map.values()).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0))
+  }, [menuItems, products, occupancyLatestByRestaurant])
+
+  const filteredRestaurants = useMemo(() => {
+    const q = normalizeText(query)
+    const now = Date.now()
+
+    return restaurants.filter((r) => {
+      const haystack = `${r.name} ${r.cuisineLabel}`.toLowerCase()
+      if (q && !haystack.includes(q)) return false
+
+      if (filters.glutenFree && !r.glutenFree) return false
+      if (filters.hasAllergens && !r.hasAllergens) return false
+      if (filters.openNow) {
+        // Heurística: "abierto" si hay señal de ocupación reciente (<2h)
+        if (!r.latestOccupancyAtMs) return false
+        if (now - r.latestOccupancyAtMs > 2 * 60 * 60 * 1000) return false
+      }
+
+      return true
+    })
+  }, [filters.glutenFree, filters.hasAllergens, filters.openNow, query, restaurants])
+
+  const kpis = useMemo(() => {
+    const now = Date.now()
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+
+    const restaurantsIntegrated = restaurants.length
+    const menusWithAllergens = restaurants.filter((r) => r.hasAllergens).length
+    const updatedLast7Days = restaurants.filter((r) => (r.updatedAtMs || 0) >= sevenDaysAgo).length
+
+    const consumes7d = auditLogs.filter((l) => l?.action === 'CONSUME')
+    const allowed = consumes7d.filter((l) => l?.decision === 'allow').length
+    const denied = consumes7d.filter((l) => l?.decision === 'deny').length
+
+    return {
+      restaurantsIntegrated,
+      menusWithAllergens,
+      updatedLast7Days,
+      consumesAllowed: allowed,
+      consumesDenied: denied,
+    }
+  }, [auditLogs, restaurants])
+
+  const loadingAny = loading.menu || loading.occupancy || loading.products || loading.audit
+
+  async function runDemoLoad() {
+    const profile = 'municipality'
+    const now = Date.now()
+    const rid = 'resto-demo-1'
+    setErrors((e) => ({ ...e, demo: null }))
+    setLoading((p) => ({ ...p, demo: true }))
+
+    try {
+      await ingestMenu(
+        {
+          restaurantId: rid,
+          currency: 'EUR',
+          items: [
+            {
+              id: 'item-1',
+              name: 'Ensalada de temporada',
+              description: 'Producto local',
+              price: 9.5,
+              category: 'Med',
+              allergens: [],
+              glutenFree: true,
+              vegan: true,
+            },
+            {
+              id: 'item-2',
+              name: 'Pasta casera',
+              description: 'Con salsa de queso',
+              price: 13.0,
+              category: 'Italian',
+              allergens: ['gluten', 'milk'],
+              glutenFree: false,
+              vegan: false,
+            },
+          ],
+        },
+        { profile },
+      )
+
+      await ingestOccupancy(
+        {
+          restaurantId: rid,
+          signals: [
+            { ts: new Date(now - 30 * 60 * 1000).toISOString(), occupancyPct: 35 },
+            { ts: new Date(now).toISOString(), occupancyPct: 48 },
+          ],
+        },
+        { profile },
+      )
+
+      await normalizeRun({ profile })
+
+      const product = await buildDataProduct({ type: 'menu', restaurantId: rid, profile })
+
+      await publishProduct({ space: 'segittur-mock', productId: product.id, profile })
+
+      await consumeProduct({ space: 'segittur-mock', productId: product.id, purpose: 'discovery', profile })
+      try {
+        await consumeProduct({ space: 'segittur-mock', productId: product.id, purpose: 'ads-targeting', profile })
+      } catch {
+        // esperado: denegado
+      }
+
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      await refreshData({ sinceIso: since })
+    } catch (err) {
+      setErrors((e) => ({ ...e, demo: err }))
+    } finally {
+      setLoading((p) => ({ ...p, demo: false }))
+    }
+  }
+
+  function SkeletonCard() {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="h-4 w-32 bg-slate-200 rounded mb-3 animate-pulse" />
+        <div className="h-8 w-20 bg-slate-200 rounded animate-pulse" />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -109,36 +354,188 @@ export default function AyuntamientoPortalTab() {
 
       {activeSubtab === 'gestion' && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Catálogo municipal</div>
-                  <div className="text-xs text-slate-500">Resumen (modo demo)</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {loadingAny ? (
+              <>
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            ) : (
+              <>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="text-xs font-bold text-indigo-600">KPI</div>
+                  <div className="text-sm font-semibold text-slate-900">Restaurantes integrados</div>
+                  <div className="mt-2 text-3xl font-bold text-slate-900">{kpis.restaurantsIntegrated}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">Data products</div>
-                  <div className="text-2xl font-bold text-slate-900">{loading.products ? '—' : products.length}</div>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="text-xs font-bold text-indigo-600">KPI</div>
+                  <div className="text-sm font-semibold text-slate-900">Menús con alérgenos</div>
+                  <div className="mt-2 text-3xl font-bold text-slate-900">{kpis.menusWithAllergens}</div>
                 </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="text-xs font-bold text-indigo-600">KPI</div>
+                  <div className="text-sm font-semibold text-slate-900">Actualizados últ. 7 días</div>
+                  <div className="mt-2 text-3xl font-bold text-slate-900">{kpis.updatedLast7Days}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="text-xs font-bold text-indigo-600">KPI</div>
+                  <div className="text-sm font-semibold text-slate-900">Consumos (7 días)</div>
+                  <div className="mt-2 flex items-end gap-3">
+                    <div className="text-3xl font-bold text-slate-900">{kpis.consumesAllowed + kpis.consumesDenied}</div>
+                    <div className="text-xs text-slate-500 pb-1">
+                      <span className="text-emerald-700 font-semibold">{kpis.consumesAllowed} OK</span>
+                      {' / '}
+                      <span className="text-amber-700 font-semibold">{kpis.consumesDenied} DENY</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {(errors.menu || errors.occupancy || errors.products || errors.audit) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              No se han podido cargar algunos datos. {toUserError(errors.menu || errors.occupancy || errors.products || errors.audit)}
+            </div>
+          )}
+
+          {errors.demo && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+              {toUserError(errors.demo)}
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Catálogo municipal</h2>
+                <p className="text-sm text-slate-500">Buscador y filtros para gestión pública</p>
               </div>
-              {errors.products && (
-                <div className="mt-3 text-xs text-red-700">{toUserError(errors.products)}</div>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+                    refreshData({ sinceIso: since })
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+                  disabled={loadingAny}
+                >
+                  <Clock className="h-4 w-4" />
+                  Actualizar
+                </button>
+              </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Trazabilidad</div>
-                  <div className="text-xs text-slate-500">Últimos eventos (modo demo)</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">Eventos</div>
-                  <div className="text-2xl font-bold text-slate-900">{loading.audit ? '—' : auditLogs.length}</div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <div className="relative">
+                  <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar por nombre o cocina…"
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                  />
                 </div>
               </div>
-              {errors.audit && (
-                <div className="mt-3 text-xs text-red-700">{toUserError(errors.audit)}</div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.openNow}
+                    onChange={(e) => setFilters((p) => ({ ...p, openNow: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-slate-700">Abierto ahora</span>
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.glutenFree}
+                    onChange={(e) => setFilters((p) => ({ ...p, glutenFree: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-slate-700">Sin gluten</span>
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.hasAllergens}
+                    onChange={(e) => setFilters((p) => ({ ...p, hasAllergens: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-slate-700">Con alérgenos</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              {loadingAny ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="h-4 w-48 bg-slate-200 rounded mb-2 animate-pulse" />
+                      <div className="h-3 w-72 bg-slate-200 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredRestaurants.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
+                  <div className="text-sm font-semibold text-slate-900">No hay datos todavía</div>
+                  <div className="text-sm text-slate-600 mt-1">
+                    Para ver el portal funcionando, puedes cargar una demo con datos de ejemplo.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={runDemoLoad}
+                    disabled={loading.demo}
+                    className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
+                  >
+                    {loading.demo ? 'Ejecutando…' : 'Ejecutar demo de carga'}
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  {filteredRestaurants.map((r) => (
+                    <div key={r.id} className="p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{r.name}</div>
+                        <div className="text-xs text-slate-500">
+                          Cocina: <span className="text-slate-700">{r.cuisineLabel || '—'}</span>
+                          {' · '}Items: <span className="text-slate-700">{r.itemsCount}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                          {r.latestOccupancyAtMs ? 'Ocupación' : 'Sin señal'}
+                        </span>
+                        {r.latestOccupancyAtMs && (
+                          <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                            {typeof r.latestOccupancyPct === 'number' ? `${r.latestOccupancyPct}%` : '—'}
+                          </span>
+                        )}
+                        {r.glutenFree && (
+                          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                            Sin gluten
+                          </span>
+                        )}
+                        {r.hasAllergens && (
+                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                            Con alérgenos
+                          </span>
+                        )}
+                        {(r.updatedAtMs || 0) > 0 && (
+                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                            Actualizado: {new Date(r.updatedAtMs).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
