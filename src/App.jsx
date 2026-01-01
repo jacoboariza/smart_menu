@@ -28,6 +28,7 @@ import {
   Cookie,
   Droplets,
   Database,
+  Building2,
 } from 'lucide-react'
 import { useRef } from 'react'
 
@@ -37,6 +38,7 @@ import JsonTab from './tabs/JsonTab.jsx'
 import PreviewTab from './tabs/PreviewTab.jsx'
 import DataHubTab from './tabs/DataHubTab.jsx'
 import AyuntamientosTab from './tabs/AyuntamientosTab.jsx'
+import AyuntamientoPortalTab from './tabs/AyuntamientoPortalTab.jsx'
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -1021,6 +1023,19 @@ ${jsonLdString}
             <Globe className="h-4 w-4" />
             Para Ayuntamientos
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('portal-ayuntamiento')}
+            className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+              activeTab === 'portal-ayuntamiento'
+                ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="h-4 w-4" />
+            Portal Ayuntamiento
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-200 absolute bottom-0 left-0 right-0">
@@ -1120,6 +1135,8 @@ ${jsonLdString}
         {activeTab === 'datahub' && <DataHubTab editorState={{ sections }} />}
 
         {activeTab === 'ayuntamientos' && <AyuntamientosTab />}
+
+        {activeTab === 'portal-ayuntamiento' && <AyuntamientoPortalTab />}
       </main>
 
       {showPdfModal && (
