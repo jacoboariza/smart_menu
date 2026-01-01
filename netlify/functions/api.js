@@ -13,11 +13,26 @@ import { gaiaXAdapter } from '../../server/adapters/GaiaXAdapterMock.js'
 import { buildMenuProduct } from '../../server/products/buildMenuProduct.js'
 import { buildOccupancyProduct } from '../../server/products/buildOccupancyProduct.js'
 import { validateDataProduct } from '../../server/domain/dataProduct.js'
+import {
+  checkRateLimit,
+  getClientId,
+  sanitizeString,
+  detectSuspiciousPayload,
+  createSecurityAuditEntry,
+} from '../../server/middleware/security.js'
 
-function buildResponse(statusCode, body) {
+// Security headers for API responses (ISO 27001 A.13)
+const SECURITY_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+  'Pragma': 'no-cache',
+}
+
+function buildResponse(statusCode, body, extraHeaders = {}) {
   return {
     statusCode,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...SECURITY_HEADERS, ...extraHeaders },
     body: JSON.stringify(body),
   }
 }
@@ -126,6 +141,41 @@ function isDataProductsBuild(path) {
 export async function handler(event, context) {
   const method = event.httpMethod
   const path = event.path || ''
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Security checks (ISO 27001 A.12 - Operations Security)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Rate limiting check
+  const clientId = getClientId(event)
+  const rateCheck = checkRateLimit(clientId)
+  if (!rateCheck.allowed) {
+    return buildResponse(429, {
+      error: {
+        code: 'rate_limit_exceeded',
+        message: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil((rateCheck.resetAt - Date.now()) / 1000),
+      },
+    }, {
+      'Retry-After': String(Math.ceil((rateCheck.resetAt - Date.now()) / 1000)),
+    })
+  }
+
+  // Suspicious payload detection for POST requests
+  if (method === 'POST' && event.body) {
+    const suspiciousCheck = detectSuspiciousPayload(event.body)
+    if (suspiciousCheck.suspicious) {
+      console.warn('Suspicious payload detected:', createSecurityAuditEntry(event, 'suspicious_payload', {
+        pattern: suspiciousCheck.pattern,
+      }))
+      return buildResponse(400, {
+        error: {
+          code: 'invalid_payload',
+          message: 'Request contains invalid characters',
+        },
+      })
+    }
+  }
 
   // GET endpoints
   if (method === 'GET') {
