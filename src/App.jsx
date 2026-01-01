@@ -1136,7 +1136,7 @@ ${jsonLdString}
 
         {activeTab === 'ayuntamientos' && <AyuntamientosTab />}
 
-        {activeTab === 'portal-ayuntamiento' && <AyuntamientoPortalTab />}
+        {activeTab === 'portal-ayuntamiento' && <AyuntamientoPortalTab editorState={{ sections }} />}
       </main>
 
       {showPdfModal && (

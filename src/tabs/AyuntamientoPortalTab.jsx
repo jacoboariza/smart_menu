@@ -12,13 +12,14 @@ import {
   publishProduct,
   toUserError,
 } from '../lib/apiClient.js'
+import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
 
 const SUBTABS = [
   { id: 'gestion', label: 'Gestión', icon: Settings2 },
   { id: 'ciudadano', label: 'Servicios al ciudadano', icon: Users },
 ]
 
-export default function AyuntamientoPortalTab() {
+export default function AyuntamientoPortalTab({ editorState } = {}) {
   const [activeSubtab, setActiveSubtab] = useState('gestion')
 
   const [loading, setLoading] = useState({
@@ -37,6 +38,11 @@ export default function AyuntamientoPortalTab() {
 
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState({ openNow: false, glutenFree: false, hasAllergens: false })
+
+  const demoModeEnabled = String(import.meta.env?.VITE_DEMO_MODE || '').trim() === 'true'
+  const [demoSteps, setDemoSteps] = useState([])
+  const [demoRunning, setDemoRunning] = useState(false)
+  const [demoError, setDemoError] = useState(null)
 
   const current = useMemo(() => SUBTABS.find((t) => t.id === activeSubtab) || SUBTABS[0], [activeSubtab])
 
@@ -253,74 +259,122 @@ export default function AyuntamientoPortalTab() {
     return restaurants.filter((r) => r.glutenFree)
   }, [restaurants])
 
-  async function runDemoLoad() {
+  function pushDemoStep(text, status = 'running') {
+    setDemoSteps((prev) => [...prev, { ts: new Date().toISOString(), text, status }])
+  }
+
+  function makeFixtureMenu(restaurantId) {
+    return {
+      restaurantId,
+      currency: 'EUR',
+      items: [
+        {
+          id: 'item-1',
+          name: 'Ensalada de temporada',
+          description: 'Producto local',
+          price: 9.5,
+          category: 'Med',
+          allergens: [],
+          glutenFree: true,
+          vegan: true,
+        },
+        {
+          id: 'item-2',
+          name: 'Pasta casera',
+          description: 'Con salsa de queso',
+          price: 13.0,
+          category: 'Italian',
+          allergens: ['gluten', 'milk'],
+          glutenFree: false,
+          vegan: false,
+        },
+      ],
+    }
+  }
+
+  async function prepareMunicipalityDemo() {
+    if (!demoModeEnabled || demoRunning) return
+
     const profile = 'municipality'
     const now = Date.now()
-    const rid = 'resto-demo-1'
-    setErrors((e) => ({ ...e, demo: null }))
-    setLoading((p) => ({ ...p, demo: true }))
+    const rids = ['resto-demo-1', 'resto-demo-2']
+
+    setDemoRunning(true)
+    setDemoError(null)
+    setDemoSteps([])
 
     try {
-      await ingestMenu(
-        {
-          restaurantId: rid,
-          currency: 'EUR',
-          items: [
-            {
-              id: 'item-1',
-              name: 'Ensalada de temporada',
-              description: 'Producto local',
-              price: 9.5,
-              category: 'Med',
-              allergens: [],
-              glutenFree: true,
-              vegan: true,
-            },
-            {
-              id: 'item-2',
-              name: 'Pasta casera',
-              description: 'Con salsa de queso',
-              price: 13.0,
-              category: 'Italian',
-              allergens: ['gluten', 'milk'],
-              glutenFree: false,
-              vegan: false,
-            },
-          ],
-        },
-        { profile },
-      )
+      pushDemoStep('Cargando catálogo…')
 
-      await ingestOccupancy(
-        {
-          restaurantId: rid,
-          signals: [
-            { ts: new Date(now - 30 * 60 * 1000).toISOString(), occupancyPct: 35 },
-            { ts: new Date(now).toISOString(), occupancyPct: 48 },
-          ],
-        },
-        { profile },
-      )
+      for (const rid of rids) {
+        let menuPayload
+        const editorSections = Array.isArray(editorState?.sections) ? editorState.sections : []
+        if (editorSections.length) {
+          const mapped = mapEditorStateToMenuIngest({ editorState, restaurantId: rid, currency: 'EUR' })
+          menuPayload = mapped?.items?.length ? mapped : makeFixtureMenu(rid)
+        } else {
+          menuPayload = makeFixtureMenu(rid)
+        }
 
+        await ingestMenu(menuPayload, { profile })
+
+        await ingestOccupancy(
+          {
+            restaurantId: rid,
+            signals: [
+              { ts: new Date(now - 75 * 60 * 1000).toISOString(), occupancyPct: 22 },
+              { ts: new Date(now - 15 * 60 * 1000).toISOString(), occupancyPct: 58 },
+              { ts: new Date(now).toISOString(), occupancyPct: 41 },
+            ],
+          },
+          { profile },
+        )
+      }
+
+      setDemoSteps((prev) => prev.map((s, idx) => (idx === 0 ? { ...s, status: 'ok' } : s)))
+
+      pushDemoStep('Actualizando disponibilidad…')
       await normalizeRun({ profile })
+      setDemoSteps((prev) => prev.map((s, idx) => (idx === 1 ? { ...s, status: 'ok' } : s)))
 
-      const product = await buildDataProduct({ type: 'menu', restaurantId: rid, profile })
+      pushDemoStep('Preparando servicios…')
+      const builtProducts = []
+      for (const rid of rids) {
+        const menuProduct = await buildDataProduct({ type: 'menu', restaurantId: rid, profile })
+        const occProduct = await buildDataProduct({ type: 'occupancy', restaurantId: rid, profile })
+        builtProducts.push(menuProduct, occProduct)
+      }
+      setDemoSteps((prev) => prev.map((s, idx) => (idx === 2 ? { ...s, status: 'ok' } : s)))
 
-      await publishProduct({ space: 'segittur-mock', productId: product.id, profile })
+      pushDemoStep('Publicando datos del municipio…')
+      for (const p of builtProducts) {
+        await publishProduct({ space: 'segittur-mock', productId: p.id, profile })
+      }
+      setDemoSteps((prev) => prev.map((s, idx) => (idx === 3 ? { ...s, status: 'ok' } : s)))
 
-      await consumeProduct({ space: 'segittur-mock', productId: product.id, purpose: 'discovery', profile })
-      try {
-        await consumeProduct({ space: 'segittur-mock', productId: product.id, purpose: 'ads-targeting', profile })
-      } catch {
-        // esperado: denegado
+      // Generar auditoría de consumos permitidos/denegados (sin mostrar nada técnico)
+      for (const p of builtProducts.filter((x) => x?.type === 'menu')) {
+        await consumeProduct({ space: 'segittur-mock', productId: p.id, purpose: 'discovery', profile })
+        try {
+          await consumeProduct({ space: 'segittur-mock', productId: p.id, purpose: 'ads-targeting', profile })
+        } catch {
+          // esperado
+        }
       }
 
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       await refreshData({ sinceIso: since })
+
+      pushDemoStep('Demo lista', 'ok')
     } catch (err) {
-      setErrors((e) => ({ ...e, demo: err }))
+      setDemoError(err)
+      setDemoSteps((prev) => {
+        if (!prev.length) return prev
+        const lastIdx = prev.length - 1
+        return prev.map((s, idx) => (idx === lastIdx ? { ...s, status: 'error' } : s))
+      })
     } finally {
-      setLoading((p) => ({ ...p, demo: false }))
+      setDemoRunning(false)
     }
   }
 
@@ -436,12 +490,6 @@ export default function AyuntamientoPortalTab() {
             </div>
           )}
 
-          {errors.demo && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-              {toUserError(errors.demo)}
-            </div>
-          )}
-
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -525,11 +573,11 @@ export default function AyuntamientoPortalTab() {
                   </div>
                   <button
                     type="button"
-                    onClick={runDemoLoad}
-                    disabled={loading.demo}
+                    onClick={demoModeEnabled ? prepareMunicipalityDemo : undefined}
+                    disabled={!demoModeEnabled || demoRunning}
                     className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
                   >
-                    {loading.demo ? 'Ejecutando…' : 'Ejecutar demo de carga'}
+                    {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
                   </button>
                 </div>
               ) : (
@@ -684,11 +732,11 @@ export default function AyuntamientoPortalTab() {
               <div className="text-sm text-slate-600 mt-1">Puedes cargar una demo para ver el servicio en funcionamiento.</div>
               <button
                 type="button"
-                onClick={runDemoLoad}
-                disabled={loading.demo}
+                onClick={demoModeEnabled ? prepareMunicipalityDemo : undefined}
+                disabled={!demoModeEnabled || demoRunning}
                 className="mt-4 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60"
               >
-                {loading.demo ? 'Ejecutando…' : 'Ejecutar demo de carga'}
+                {demoRunning ? 'Preparando…' : 'Preparar demo con datos'}
               </button>
             </div>
           ) : (
