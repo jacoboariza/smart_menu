@@ -63,6 +63,11 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       setLoadingDishSearch(true)
       const space = 'segittur-mock'
       const catalog = await getMunicipalCatalog(space)
+      console.log('Municipal catalog loaded:', catalog)
+      console.log('Number of restaurants:', catalog.length)
+      if (catalog.length > 0) {
+        console.log('First restaurant menuItems:', catalog[0].menuItems)
+      }
       setMunicipalCatalog(catalog)
     } catch (err) {
       console.error('Error loading municipal catalog:', err)
@@ -291,6 +296,13 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       return
     }
 
+    console.log('Running dish search with:', {
+      query: dishQuery,
+      catalogLength: municipalCatalog.length,
+      glutenFreeOnly: dishFilters.glutenFreeOnly,
+      veganOnly: dishFilters.veganOnly,
+    })
+
     const results = searchRestaurantsByDish({
       catalog: municipalCatalog,
       query: dishQuery,
@@ -298,6 +310,7 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       veganOnly: dishFilters.veganOnly,
     })
 
+    console.log('Search results:', results)
     setDishResults(results)
   }
 

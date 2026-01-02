@@ -4,7 +4,8 @@ import path from 'path'
 const DATA_DIR = path.join(process.cwd(), 'server', 'storage', 'data')
 
 function fileForSpace(space) {
-  return path.join(DATA_DIR, `published_${space}_mock.json`)
+  const spaceName = space.replace(/-/g, '_')
+  return path.join(DATA_DIR, `published_${spaceName}_mock.json`)
 }
 
 function tmpForSpace(space) {
