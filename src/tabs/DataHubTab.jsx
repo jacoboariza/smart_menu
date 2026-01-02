@@ -68,12 +68,14 @@ export default function DataHubTab({ editorState }) {
 
   useEffect(() => {
     try {
+      const storedApiKey = sessionStorage.getItem('dataHub.apiKey')
       const storedOrgId = sessionStorage.getItem('dataHub.orgId')
       const storedRestaurantId = sessionStorage.getItem('dataHub.restaurantId')
       const storedCurrency = sessionStorage.getItem('dataHub.currency')
       const storedSpace = sessionStorage.getItem('dataHub.lastSpace')
       const storedPurpose = sessionStorage.getItem('dataHub.lastPurpose')
 
+      if (storedApiKey !== null) setApiKey(storedApiKey)
       if (storedOrgId !== null) setOrgId(storedOrgId)
       if (storedRestaurantId !== null) {
         setRestaurantId(storedRestaurantId)
@@ -86,6 +88,14 @@ export default function DataHubTab({ editorState }) {
       // ignore sessionStorage errors
     }
   }, [])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dataHub.apiKey', apiKey || '')
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }, [apiKey])
 
   useEffect(() => {
     try {
@@ -662,7 +672,7 @@ export default function DataHubTab({ editorState }) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="API Key" hint="Se guarda solo en estado React (no se persiste).">
+          <Field label="API Key" hint="Se guarda solo en la sesión del navegador (sessionStorage).">
             <div className="flex gap-2">
               <input
                 type={showApiKey ? 'text' : 'password'}

@@ -1,6 +1,9 @@
 export function getApiBaseUrl() {
   const configured = import.meta.env?.VITE_API_BASE_URL
   if (configured && String(configured).trim()) return String(configured).trim()
+  // Prefer the local Netlify dev server when running locally; fall back to relative path in prod
+  const isLocalhost = typeof window !== 'undefined' && window.location?.hostname === 'localhost'
+  if (isLocalhost) return 'http://localhost:8888/.netlify/functions/api'
   return '/.netlify/functions/api'
 }
 
