@@ -13,6 +13,7 @@ import {
   toUserError,
 } from '../lib/apiClient.js'
 import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
+import { getMunicipalCatalog, searchRestaurantsByDish } from '../lib/municipality/municipalityService.js'
 
 const SUBTABS = [
   { id: 'gestion', label: 'Gestión', icon: Settings2 },
@@ -39,12 +40,36 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState({ openNow: false, glutenFree: false, hasAllergens: false })
 
-  const demoModeEnabled = String(import.meta.env?.VITE_DEMO_MODE || '').trim() === 'true'
+  const [dishQuery, setDishQuery] = useState('')
+  const [dishFilters, setDishFilters] = useState({ glutenFreeOnly: false, veganOnly: false })
+  const [dishResults, setDishResults] = useState([])
+  const [municipalCatalog, setMunicipalCatalog] = useState([])
+  const [loadingDishSearch, setLoadingDishSearch] = useState(false)
+
+  function isLocalDevHost() {
+    const host = typeof window !== 'undefined' ? window.location?.hostname : ''
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  }
+
+  const demoModeEnabled = String(import.meta.env?.VITE_DEMO_MODE || '').trim() === 'true' || isLocalDevHost()
   const [demoSteps, setDemoSteps] = useState([])
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoError, setDemoError] = useState(null)
 
   const current = useMemo(() => SUBTABS.find((t) => t.id === activeSubtab) || SUBTABS[0], [activeSubtab])
+
+  async function loadMunicipalCatalog() {
+    try {
+      setLoadingDishSearch(true)
+      const space = 'segittur-mock'
+      const catalog = await getMunicipalCatalog(space)
+      setMunicipalCatalog(catalog)
+    } catch (err) {
+      console.error('Error loading municipal catalog:', err)
+    } finally {
+      setLoadingDishSearch(false)
+    }
+  }
 
   async function refreshData({ sinceIso } = {}) {
     const profile = 'municipality'
@@ -101,6 +126,7 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   useEffect(() => {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     refreshData({ sinceIso: since })
+    loadMunicipalCatalog()
   }, [])
 
   function toMs(iso) {
@@ -258,6 +284,28 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   const glutenFreeRestaurants = useMemo(() => {
     return restaurants.filter((r) => r.glutenFree)
   }, [restaurants])
+
+  function runDishSearch() {
+    if (!dishQuery.trim()) {
+      setDishResults([])
+      return
+    }
+
+    const results = searchRestaurantsByDish({
+      catalog: municipalCatalog,
+      query: dishQuery,
+      glutenFreeOnly: dishFilters.glutenFreeOnly,
+      veganOnly: dishFilters.veganOnly,
+    })
+
+    setDishResults(results)
+  }
+
+  function handleDishSearchKeyPress(e) {
+    if (e.key === 'Enter') {
+      runDishSearch()
+    }
+  }
 
   function pushDemoStep(text, status = 'running') {
     setDemoSteps((prev) => [...prev, { ts: new Date().toISOString(), text, status }])
@@ -894,6 +942,134 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Buscar por plato</h3>
+                  <p className="text-sm text-slate-600 mt-1">Encuentra restaurantes que ofrezcan un plato específico.</p>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        value={dishQuery}
+                        onChange={(e) => setDishQuery(e.target.value)}
+                        onKeyPress={handleDishSearchKeyPress}
+                        placeholder="Ej.: paella, lasaña, hummus, tortilla…"
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={runDishSearch}
+                      disabled={loadingDishSearch || !dishQuery.trim()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Search className="h-4 w-4" />
+                      Buscar
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={dishFilters.glutenFreeOnly}
+                        onChange={(e) => setDishFilters((p) => ({ ...p, glutenFreeOnly: e.target.checked }))}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-slate-700">Solo sin gluten</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={dishFilters.veganOnly}
+                        onChange={(e) => setDishFilters((p) => ({ ...p, veganOnly: e.target.checked }))}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-slate-700">Solo vegano</span>
+                    </label>
+                  </div>
+                </div>
+
+                {dishQuery.trim() && dishResults.length === 0 && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="text-sm font-semibold text-slate-900">No se encontraron resultados</div>
+                    <div className="text-sm text-slate-600 mt-1">
+                      Prueba con otros términos como "pasta", "ensalada", "arroz" o "tarta".
+                    </div>
+                  </div>
+                )}
+
+                {dishResults.length > 0 && (
+                  <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    {dishResults.map((result) => {
+                      const restaurantData = restaurants.find((r) => r.id === result.restaurantId)
+                      const level = restaurantData ? occupancyLevel(restaurantData.latestOccupancyPct) : null
+                      const isOpenNow = restaurantData?.latestOccupancyAtMs && (Date.now() - restaurantData.latestOccupancyAtMs <= 2 * 60 * 60 * 1000)
+
+                      return (
+                        <div key={result.restaurantId} className="p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-900">{result.name}</div>
+                              <div className="mt-2 space-y-1.5">
+                                {result.matchedItems.slice(0, 3).map((item, idx) => (
+                                  <div key={idx} className="flex items-start gap-2">
+                                    <div className="text-xs text-slate-700 flex-1">
+                                      <span className="font-medium">{item.name}</span>
+                                      {item.description && (
+                                        <span className="text-slate-500"> — {item.description}</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                      {item.glutenFree && (
+                                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                          Sin gluten
+                                        </span>
+                                      )}
+                                      {item.vegan && (
+                                        <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                                          Vegano
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {isOpenNow && (
+                                <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                  Abierto ahora
+                                </span>
+                              )}
+                              {!isOpenNow && restaurantData?.latestOccupancyAtMs && (
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                                  Cerrado
+                                </span>
+                              )}
+                              {level && (
+                                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${level.className}`}>
+                                  Ocupación {level.label}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {dishResults.length > 0 && (
+                  <div className="mt-3 text-xs text-slate-500">
+                    {dishResults.length} {dishResults.length === 1 ? 'restaurante encontrado' : 'restaurantes encontrados'}
                   </div>
                 )}
               </div>

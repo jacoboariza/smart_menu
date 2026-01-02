@@ -241,6 +241,8 @@ export async function handler(event, context) {
           const items = Array.isArray(consumeRes?.payload) ? consumeRes.payload : []
           const allergensSet = new Set()
           let anyGlutenFree = false
+          const menuItems = []
+          
           for (const it of items) {
             if (it?.glutenFree) anyGlutenFree = true
             const alls = Array.isArray(it?.allergens) ? it.allergens : []
@@ -248,6 +250,14 @@ export async function handler(event, context) {
               const v = String(a || '').trim()
               if (v) allergensSet.add(v)
             }
+            
+            menuItems.push({
+              name: String(it?.name || ''),
+              description: String(it?.description || ''),
+              glutenFree: Boolean(it?.glutenFree),
+              vegan: Boolean(it?.vegan),
+              category: String(it?.category || ''),
+            })
           }
 
           restaurants.push({
@@ -256,6 +266,7 @@ export async function handler(event, context) {
             glutenFree: anyGlutenFree,
             allergens: Array.from(allergensSet),
             updatedAt: p?.createdAt || null,
+            menuItems,
           })
         }
 
