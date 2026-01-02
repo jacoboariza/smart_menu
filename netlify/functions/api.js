@@ -8,6 +8,7 @@ import {
 } from '../../server/storage/normalizedRepo.js'
 import { getById as getDataProduct, list as listDataProducts, upsert as upsertDataProduct } from '../../server/storage/dataProductRepo.js'
 import { list as listAudit } from '../../server/storage/auditRepo.js'
+import { list as listPublished } from '../../server/storage/publishedRepo.js'
 import { segitturAdapter } from '../../server/adapters/SegitturAdapterMock.js'
 import { gaiaXAdapter } from '../../server/adapters/GaiaXAdapterMock.js'
 import { buildMenuProduct } from '../../server/products/buildMenuProduct.js'
@@ -138,6 +139,28 @@ function isDataProductsBuild(path) {
   return normalized.endsWith('/data-products/build') || normalized.includes('/data-products/build')
 }
 
+function isMunicipalityCatalog(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/municipality/catalog') || normalized.includes('/municipality/catalog')
+}
+
+function isMunicipalityOccupancy(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/municipality/occupancy') || normalized.includes('/municipality/occupancy')
+}
+
+function isMunicipalityKpis(path) {
+  const normalized = path.replace(/\/*$/, '')
+  return normalized.endsWith('/municipality/kpis') || normalized.includes('/municipality/kpis')
+}
+
+function occupancyLevel(pct) {
+  if (typeof pct !== 'number') return null
+  if (pct < 35) return 'low'
+  if (pct < 70) return 'medium'
+  return 'high'
+}
+
 export async function handler(event, context) {
   const method = event.httpMethod
   const path = event.path || ''
@@ -184,6 +207,171 @@ export async function handler(event, context) {
     }
 
     const orgId = event.headers?.['x-org-id'] || event.headers?.['X-Org-Id'] || null
+    const actor = { orgId: orgId || 'municipality', roles: ['destination'] }
+
+    if (isMunicipalityCatalog(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const spaceParam = params.space
+        if (!spaceParam) {
+          return buildResponse(400, { error: { code: 'validation_error', message: 'space is required' } })
+        }
+
+        const normalizedSpace = normalizeSpace(spaceParam)
+        if (!normalizedSpace.ok) {
+          return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+        }
+
+        const adapter = getAdapterForSpace(normalizedSpace.space)
+        if (!adapter) {
+          return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${normalizedSpace.space}' not supported` } })
+        }
+
+        const published = await listPublished(normalizedSpace.space)
+        const menuProducts = published.filter((p) => p?.type === 'menu')
+
+        const restaurants = []
+        for (const p of menuProducts) {
+          const rid = p?.payloadRef?.restaurantId || p?.metadata?.restaurantId
+          if (!rid) continue
+
+          const consumeRes = await adapter.consume(normalizedSpace.space, p.id, actor, 'discovery')
+          if (consumeRes?.denied) continue
+
+          const items = Array.isArray(consumeRes?.payload) ? consumeRes.payload : []
+          const allergensSet = new Set()
+          let anyGlutenFree = false
+          for (const it of items) {
+            if (it?.glutenFree) anyGlutenFree = true
+            const alls = Array.isArray(it?.allergens) ? it.allergens : []
+            for (const a of alls) {
+              const v = String(a || '').trim()
+              if (v) allergensSet.add(v)
+            }
+          }
+
+          restaurants.push({
+            restaurantId: rid,
+            name: rid,
+            glutenFree: anyGlutenFree,
+            allergens: Array.from(allergensSet),
+            updatedAt: p?.createdAt || null,
+          })
+        }
+
+        return buildResponse(200, { items: restaurants })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'municipality_catalog_error', message: err.message } })
+      }
+    }
+
+    if (isMunicipalityOccupancy(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const spaceParam = params.space
+        if (!spaceParam) {
+          return buildResponse(400, { error: { code: 'validation_error', message: 'space is required' } })
+        }
+
+        const normalizedSpace = normalizeSpace(spaceParam)
+        if (!normalizedSpace.ok) {
+          return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+        }
+
+        const adapter = getAdapterForSpace(normalizedSpace.space)
+        if (!adapter) {
+          return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${normalizedSpace.space}' not supported` } })
+        }
+
+        const published = await listPublished(normalizedSpace.space)
+        const occupancyProducts = published.filter((p) => p?.type === 'occupancy')
+
+        const latestByRestaurant = new Map()
+        for (const p of occupancyProducts) {
+          const rid = p?.payloadRef?.restaurantId || p?.metadata?.restaurantId
+          if (!rid) continue
+
+          const consumeRes = await adapter.consume(normalizedSpace.space, p.id, actor, 'discovery')
+          if (consumeRes?.denied) continue
+
+          const signals = Array.isArray(consumeRes?.payload) ? consumeRes.payload : []
+          for (const s of signals) {
+            const ts = s?.ts
+            const ms = Date.parse(ts)
+            if (!ts || Number.isNaN(ms)) continue
+            const prev = latestByRestaurant.get(rid)
+            if (!prev || ms > prev.ms) {
+              latestByRestaurant.set(rid, { ms, ts, pct: s?.occupancyPct })
+            }
+          }
+        }
+
+        const items = Array.from(latestByRestaurant.entries()).map(([restaurantId, v]) => ({
+          restaurantId,
+          level: occupancyLevel(v.pct),
+          ts: v.ts,
+        }))
+
+        return buildResponse(200, { items })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'municipality_occupancy_error', message: err.message } })
+      }
+    }
+
+    if (isMunicipalityKpis(path)) {
+      try {
+        const params = event.queryStringParameters || {}
+        const spaceParam = params.space
+        if (!spaceParam) {
+          return buildResponse(400, { error: { code: 'validation_error', message: 'space is required' } })
+        }
+
+        const normalizedSpace = normalizeSpace(spaceParam)
+        if (!normalizedSpace.ok) {
+          return buildResponse(normalizedSpace.statusCode, { error: normalizedSpace.error })
+        }
+
+        const adapter = getAdapterForSpace(normalizedSpace.space)
+        if (!adapter) {
+          return buildResponse(404, { error: { code: 'space_not_found', message: `Space '${normalizedSpace.space}' not supported` } })
+        }
+
+        const published = await listPublished(normalizedSpace.space)
+        const menuProducts = published.filter((p) => p?.type === 'menu')
+
+        const restaurants = new Set()
+        let menusWithAllergens = 0
+
+        for (const p of menuProducts) {
+          const rid = p?.payloadRef?.restaurantId || p?.metadata?.restaurantId
+          if (!rid) continue
+          restaurants.add(rid)
+
+          const consumeRes = await adapter.consume(normalizedSpace.space, p.id, actor, 'discovery')
+          if (consumeRes?.denied) continue
+
+          const items = Array.isArray(consumeRes?.payload) ? consumeRes.payload : []
+          const hasAllergens = items.some((it) => Array.isArray(it?.allergens) && it.allergens.length > 0)
+          if (hasAllergens) menusWithAllergens += 1
+        }
+
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        const logs = await listAudit({ action: 'CONSUME', space: normalizedSpace.space, since })
+        const allowed = logs.filter((l) => l?.decision === 'allow').length
+        const denied = logs.filter((l) => l?.decision === 'deny').length
+
+        return buildResponse(200, {
+          restaurantsPublished: restaurants.size,
+          menusWithAllergens,
+          consumesLast7Days: {
+            allow: allowed,
+            deny: denied,
+          },
+        })
+      } catch (err) {
+        return buildResponse(500, { error: { code: 'municipality_kpis_error', message: err.message } })
+      }
+    }
 
     // GET /audit/logs
     if (isAuditLogs(path)) {
