@@ -963,6 +963,12 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">Buscar por plato</h3>
                   <p className="text-sm text-slate-600 mt-1">Encuentra restaurantes que ofrezcan un plato específico.</p>
+                  {municipalCatalog.length > 0 && (
+                    <p className="text-xs text-emerald-600 mt-1">✓ Catálogo cargado: {municipalCatalog.length} restaurantes con {municipalCatalog.reduce((sum, r) => sum + (r.menuItems?.length || 0), 0)} platos</p>
+                  )}
+                  {municipalCatalog.length === 0 && !loadingDishSearch && (
+                    <p className="text-xs text-amber-600 mt-1">⚠ Catálogo vacío - recarga la página</p>
+                  )}
                 </div>
 
                 <div className="mt-4 space-y-3">
