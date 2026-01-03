@@ -3,7 +3,7 @@ import { AccessPolicy } from './policy.js'
 
 export const DataProduct = z.object({
   id: z.string().uuid(),
-  type: z.enum(['menu', 'occupancy']),
+  type: z.enum(['menu', 'occupancy', 'restaurant']),
   version: z.string().min(1),
   schema: z.record(z.string(), z.any()),
   metadata: z.object({
@@ -18,7 +18,7 @@ export const DataProduct = z.object({
   payloadRef: z
     .object({
       kind: z.literal('normalized'),
-      source: z.enum(['menu', 'occupancy']),
+      source: z.enum(['menu', 'occupancy', 'restaurant']),
       restaurantId: z.string().min(1),
     })
     .optional(),

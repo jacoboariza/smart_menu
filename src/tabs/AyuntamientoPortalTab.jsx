@@ -1,19 +1,54 @@
+import {
+  BarChart3,
+  Building2,
+  Clock,
+  FileCheck2,
+  LifeBuoy,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Shield,
+  Users,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, Clock, FileCheck2, LifeBuoy, Search, Settings2, ShieldCheck, Users } from 'lucide-react'
+
 import {
   buildDataProduct,
   consumeProduct,
   debugNormalized,
   ingestMenu,
   ingestOccupancy,
+  ingestRestaurant,
   listAuditLogs,
   listDataProducts,
   normalizeRun,
   publishProduct,
   toUserError,
 } from '../lib/apiClient.js'
+import { isRestaurantOpenNow } from '../lib/openingHours.js'
 import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
+import { mapEditorStateToRestaurantIngest } from '../lib/mappers/restaurantMapper.js'
 import { getMunicipalCatalog, searchRestaurantsByDish } from '../lib/municipality/municipalityService.js'
+
+/**
+ * Portal Ayuntamiento
+ *
+ * Esta vista actúa como un “panel municipal” simplificado con dos sub-secciones:
+ * - Gestión: KPIs y listado interno basado en datos normalizados.
+ * - Servicios al ciudadano: recomendaciones y buscador orientado a consumo ciudadano.
+ *
+ * Flujo de datos (alto nivel):
+ * - Normalized store (debug): se consulta vía `debugNormalized()` para obtener
+ *   `menu` + `restaurant` + `occupancy` y se combina en un modelo `restaurants`.
+ * - Catálogo municipal (published): se consulta vía `getMunicipalCatalog()` y
+ *   se usa para la búsqueda por plato (`searchRestaurantsByDish`).
+ *
+ * Nota sobre “abierto ahora”:
+ * - El cálculo se hace con `isRestaurantOpenNow({ timezone, weeklySchedule, exceptions })`.
+ * - Si no hay horarios configurados, el helper puede devolver `null` y se trata
+ *   como “sin filtro”/“desconocido” para no ocultar resultados.
+ */
 
 const SUBTABS = [
   { id: 'gestion', label: 'Gestión', icon: Settings2 },
@@ -23,23 +58,32 @@ const SUBTABS = [
 export default function AyuntamientoPortalTab({ editorState } = {}) {
   const [activeSubtab, setActiveSubtab] = useState('gestion')
 
+  // Estados de carga y error por “fuente” de datos.
   const [loading, setLoading] = useState({
     menu: false,
     occupancy: false,
+    restaurant: false,
     products: false,
     audit: false,
     demo: false,
   })
-  const [errors, setErrors] = useState({ menu: null, occupancy: null, products: null, audit: null, demo: null })
+  const [errors, setErrors] = useState({ menu: null, occupancy: null, restaurant: null, products: null, audit: null, demo: null })
 
+  // Datos normalizados (debug):
+  // - menuItems: items de carta por restaurante
+  // - occupancySignals: señales temporales de ocupación
+  // - restaurantProfiles: perfil del restaurante (incl. timezone/horarios)
   const [menuItems, setMenuItems] = useState([])
   const [occupancySignals, setOccupancySignals] = useState([])
+  const [restaurantProfiles, setRestaurantProfiles] = useState([])
   const [products, setProducts] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
 
+  // Filtros de búsqueda/gestión.
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState({ openNow: false, glutenFree: false, hasAllergens: false })
 
+  // Búsqueda por plato (usa el catálogo municipal publicado).
   const [dishQuery, setDishQuery] = useState('')
   const [dishFilters, setDishFilters] = useState({ glutenFreeOnly: false, veganOnly: false })
   const [dishResults, setDishResults] = useState([])
@@ -58,6 +102,12 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
 
   const current = useMemo(() => SUBTABS.find((t) => t.id === activeSubtab) || SUBTABS[0], [activeSubtab])
 
+  /**
+   * Carga el catálogo municipal “de consumo” (published/consume).
+   *
+   * Este catálogo es el que se utiliza para la búsqueda por plato.
+   * Importante: se consulta contra una `space` concreta (en demo: `segittur-mock`).
+   */
   async function loadMunicipalCatalog() {
     try {
       setLoadingDishSearch(true)
@@ -76,6 +126,12 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
     }
   }
 
+  /**
+   * Refresca datos internos (debug/normalized) y trazabilidad:
+   * - menu / occupancy / restaurant: de normalized store (para combinar en `restaurants`)
+   * - products: data-products construidos
+   * - audit: logs de policy/audit (p.ej. consumes allow/deny)
+   */
   async function refreshData({ sinceIso } = {}) {
     const profile = 'municipality'
 
@@ -101,6 +157,18 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       setErrors((e) => ({ ...e, occupancy: err }))
     } finally {
       setLoading((p) => ({ ...p, occupancy: false }))
+    }
+
+    setLoading((p) => ({ ...p, restaurant: true }))
+    setErrors((e) => ({ ...e, restaurant: null }))
+    try {
+      const res = await debugNormalized({ type: 'restaurant', profile })
+      const list = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []
+      setRestaurantProfiles(list)
+    } catch (err) {
+      setErrors((e) => ({ ...e, restaurant: err }))
+    } finally {
+      setLoading((p) => ({ ...p, restaurant: false }))
     }
 
     setLoading((p) => ({ ...p, products: true }))
@@ -152,6 +220,7 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   }
 
   const occupancyLatestByRestaurant = useMemo(() => {
+    // Reduce: mantener la última señal (por timestamp) por restaurante.
     const map = new Map()
     for (const s of occupancySignals) {
       const rid = s?.restaurantId
@@ -166,6 +235,8 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   }, [occupancySignals])
 
   const restaurants = useMemo(() => {
+    // Combina `menuItems` + `restaurantProfiles` + `products` + `occupancySignals` en un único modelo.
+    // Esto alimenta tanto “Gestión” (filtros/KPIs) como “Servicios al ciudadano”.
     const map = new Map()
     for (const it of menuItems) {
       const rid = it?.restaurantId
@@ -189,6 +260,13 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       map.set(rid, current)
     }
 
+    const profileByRestaurant = new Map()
+    for (const rp of restaurantProfiles) {
+      const rid = rp?.restaurantId
+      if (!rid) continue
+      profileByRestaurant.set(rid, rp)
+    }
+
     const productByRestaurant = new Map()
     for (const p of products) {
       const rid = p?.metadata?.restaurantId
@@ -207,10 +285,16 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       v.latestOccupancyAtMs = occ?.ms || 0
       v.latestOccupancyPct = occ?.signal?.occupancyPct
       v.cuisineLabel = Array.from(v.cuisines).slice(0, 2).join(' · ')
+
+      // Perfil del restaurante (timezone/horarios). Fallbacks para mantener UI robusta.
+      const rp = profileByRestaurant.get(rid)
+      v.timezone = rp?.timezone ? String(rp.timezone) : 'Europe/Madrid'
+      v.weeklySchedule = Array.isArray(rp?.weeklySchedule) ? rp.weeklySchedule : []
+      v.exceptions = Array.isArray(rp?.exceptions) ? rp.exceptions : []
     }
 
     return Array.from(map.values()).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0))
-  }, [menuItems, products, occupancyLatestByRestaurant])
+  }, [menuItems, products, occupancyLatestByRestaurant, restaurantProfiles])
 
   const filteredRestaurants = useMemo(() => {
     const q = normalizeText(query)
@@ -223,9 +307,16 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       if (filters.glutenFree && !r.glutenFree) return false
       if (filters.hasAllergens && !r.hasAllergens) return false
       if (filters.openNow) {
-        // Heurística: "abierto" si hay señal de ocupación reciente (<2h)
-        if (!r.latestOccupancyAtMs) return false
-        if (now - r.latestOccupancyAtMs > 2 * 60 * 60 * 1000) return false
+        // `open === null` significa “sin horarios configurados”: no filtramos para
+        // evitar ocultar restaurantes sin schedule.
+        const open = isRestaurantOpenNow({
+          timezone: r.timezone,
+          weeklySchedule: r.weeklySchedule,
+          exceptions: r.exceptions,
+        })
+        // Si no hay horarios configurados, mantenemos el comportamiento previo (no filtrar)
+        if (open === null) return true
+        if (!open) return false
       }
 
       return true
@@ -233,6 +324,7 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   }, [filters.glutenFree, filters.hasAllergens, filters.openNow, query, restaurants])
 
   const kpis = useMemo(() => {
+    // KPIs de gestión (ventana 7 días).
     const now = Date.now()
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
 
@@ -279,10 +371,16 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   }, [menuItems])
 
   const openNowRestaurants = useMemo(() => {
-    const now = Date.now()
-    const recent = restaurants.filter((r) => r.latestOccupancyAtMs && now - r.latestOccupancyAtMs <= 2 * 60 * 60 * 1000)
-    if (recent.length > 0) return recent
-    // Si no tenemos horarios (ni señales recientes), no filtramos por horario
+    // En “Servicios al ciudadano” priorizamos restaurantes con horario,
+    // pero mantenemos fallback para no dejar la pantalla vacía.
+    const withSchedule = restaurants.filter((r) => Array.isArray(r.weeklySchedule) && r.weeklySchedule.length)
+    if (withSchedule.length > 0) {
+      return restaurants.filter((r) => {
+        const open = isRestaurantOpenNow({ timezone: r.timezone, weeklySchedule: r.weeklySchedule, exceptions: r.exceptions })
+        return open === null ? true : open
+      })
+    }
+    // Fallback: si no tenemos horarios, mostramos todos
     return restaurants
   }, [restaurants])
 
@@ -291,6 +389,8 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
   }, [restaurants])
 
   function runDishSearch() {
+    // Búsqueda local sobre `municipalCatalog` (ya cargado) para encontrar restaurantes
+    // que tengan items que “matchean” el query, con filtros opcionales.
     if (!dishQuery.trim()) {
       setDishResults([])
       return
@@ -353,7 +453,28 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
     }
   }
 
+  function makeFixtureRestaurantProfile(restaurantId) {
+    return mapEditorStateToRestaurantIngest({
+      restaurantId,
+      name: editorState?.restaurantName || `Restaurante ${restaurantId}`,
+      phone: editorState?.restaurantPhone,
+      url: editorState?.restaurantUrl,
+      cuisine: editorState?.restaurantCuisine,
+      image: editorState?.restaurantImage,
+      address: editorState?.address,
+      timezone: editorState?.timezone || 'Europe/Madrid',
+      weeklySchedule: editorState?.weeklySchedule,
+      exceptions: editorState?.exceptions,
+    })
+  }
+
   async function prepareMunicipalityDemo() {
+    // Demo end-to-end (solo cuando está habilitado):
+    // 1) ingest (restaurant + menu + occupancy)
+    // 2) normalize
+    // 3) build data products
+    // 4) publish (space: segittur-mock)
+    // 5) consume para generar auditoría allow/deny
     if (!demoModeEnabled || demoRunning) return
 
     const profile = 'municipality'
@@ -368,6 +489,8 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       pushDemoStep('Cargando catálogo…')
 
       for (const rid of rids) {
+        await ingestRestaurant(makeFixtureRestaurantProfile(rid), { profile })
+
         let menuPayload
         const editorSections = Array.isArray(editorState?.sections) ? editorState.sections : []
         if (editorSections.length) {
@@ -401,9 +524,10 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
       pushDemoStep('Preparando servicios…')
       const builtProducts = []
       for (const rid of rids) {
+        const restaurantProduct = await buildDataProduct({ type: 'restaurant', restaurantId: rid, profile })
         const menuProduct = await buildDataProduct({ type: 'menu', restaurantId: rid, profile })
         const occProduct = await buildDataProduct({ type: 'occupancy', restaurantId: rid, profile })
-        builtProducts.push(menuProduct, occProduct)
+        builtProducts.push(restaurantProduct, menuProduct, occProduct)
       }
       setDemoSteps((prev) => prev.map((s, idx) => (idx === 2 ? { ...s, status: 'ok' } : s)))
 
@@ -1030,7 +1154,13 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
                     {dishResults.map((result) => {
                       const restaurantData = restaurants.find((r) => r.id === result.restaurantId)
                       const level = restaurantData ? occupancyLevel(restaurantData.latestOccupancyPct) : null
-                      const isOpenNow = restaurantData?.latestOccupancyAtMs && (Date.now() - restaurantData.latestOccupancyAtMs <= 2 * 60 * 60 * 1000)
+                      const isOpenNow = restaurantData
+                        ? isRestaurantOpenNow({
+                            timezone: restaurantData.timezone,
+                            weeklySchedule: restaurantData.weeklySchedule,
+                            exceptions: restaurantData.exceptions,
+                          })
+                        : null
 
                       return (
                         <div key={result.restaurantId} className="p-4">
@@ -1068,7 +1198,7 @@ export default function AyuntamientoPortalTab({ editorState } = {}) {
                                   Abierto ahora
                                 </span>
                               )}
-                              {!isOpenNow && restaurantData?.latestOccupancyAtMs && (
+                              {isOpenNow === false && (
                                 <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                                   Cerrado
                                 </span>

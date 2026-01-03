@@ -145,6 +145,14 @@ export function ingestOccupancy(payload, { apiKey, orgId, roles, profile } = {})
   })
 }
 
+export function ingestRestaurant(payload, { apiKey, orgId, roles, profile } = {}) {
+  return request('/ingest/restaurant', {
+    method: 'POST',
+    headers: buildHeaders({ apiKey, orgId, roles, profile }),
+    body: payload,
+  })
+}
+
 export function normalizeRun({ apiKey, orgId, roles, profile } = {}) {
   return request('/normalize/run', {
     method: 'POST',

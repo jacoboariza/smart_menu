@@ -1,7 +1,8 @@
 import { MenuConnectorJson } from './menuJsonConnector.js'
 import { OccupancyConnectorEvents } from './occupancyEventsConnector.js'
+import { RestaurantConnectorProfile } from './restaurantConnector.js'
 
-export const CONNECTORS = [MenuConnectorJson, OccupancyConnectorEvents]
+export const CONNECTORS = [MenuConnectorJson, OccupancyConnectorEvents, RestaurantConnectorProfile]
 
 const bySource = new Map(CONNECTORS.map((c) => [c.source, c]))
 

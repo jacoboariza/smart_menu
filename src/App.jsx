@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Component, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   CheckCircle2,
@@ -30,7 +30,6 @@ import {
   Database,
   Building2,
 } from 'lucide-react'
-import { useRef } from 'react'
 
 import InicioTab from './tabs/InicioTab.jsx'
 import EditorTab from './tabs/EditorTab.jsx'
@@ -39,6 +38,40 @@ import PreviewTab from './tabs/PreviewTab.jsx'
 import DataHubTab from './tabs/DataHubTab.jsx'
 import AyuntamientosTab from './tabs/AyuntamientosTab.jsx'
 import AyuntamientoPortalTab from './tabs/AyuntamientoPortalTab.jsx'
+import { debugNormalized, toUserError } from './lib/apiClient.js'
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error) {
+      const message = this.state.error?.message ? String(this.state.error.message) : 'Unknown error'
+      const stack = this.state.error?.stack ? String(this.state.error.stack) : ''
+      return (
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-5">
+            <div className="text-sm font-semibold text-rose-900">Error en la UI</div>
+            <div className="mt-2 text-sm text-rose-800">{message}</div>
+            {stack && (
+              <pre className="mt-4 whitespace-pre-wrap text-xs text-rose-800 bg-white/60 border border-rose-200 rounded-lg p-3 overflow-auto">
+                {stack}
+              </pre>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -49,11 +82,17 @@ const CURRENCIES = [{ code: 'EUR', symbol: '€' }]
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio')
   const [copied, setCopied] = useState(false)
+  const [restaurantId, setRestaurantId] = useState('')
   const [restaurantName, setRestaurantName] = useState('Mi Restaurante')
   const [restaurantImage, setRestaurantImage] = useState('')
   const [restaurantPhone, setRestaurantPhone] = useState('')
   const [restaurantUrl, setRestaurantUrl] = useState('')
   const [restaurantCuisine, setRestaurantCuisine] = useState('')
+  const [restaurantTimezone, setRestaurantTimezone] = useState('Europe/Madrid')
+  const [restaurantWeeklySchedule, setRestaurantWeeklySchedule] = useState(
+    Array.from({ length: 7 }).map((_, day) => ({ day, slots: [] })),
+  )
+  const [restaurantExceptions, setRestaurantExceptions] = useState([])
   const [restaurantStreet, setRestaurantStreet] = useState('')
   const [restaurantCity, setRestaurantCity] = useState('')
   const [restaurantPostalCode, setRestaurantPostalCode] = useState('')
@@ -75,6 +114,118 @@ export default function App() {
   const [legalTab, setLegalTab] = useState('privacy')
   const [webAutofillLoading, setWebAutofillLoading] = useState(false)
   const [webAutofillError, setWebAutofillError] = useState('')
+
+  function normalizeTextForSearch(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  }
+
+  function menuItemsToEditorSections(menuItems) {
+    const byCategory = new Map()
+    const items = Array.isArray(menuItems) ? menuItems : []
+
+    for (const it of items) {
+      const category = it?.category ? String(it.category) : 'Sin categoría'
+      const list = byCategory.get(category) || []
+      list.push(it)
+      byCategory.set(category, list)
+    }
+
+    return Array.from(byCategory.entries()).map(([category, list]) => ({
+      id: uid(),
+      name: category,
+      items: list.map((it) => ({
+        id: it?.id ? String(it.id) : uid(),
+        name: String(it?.name || ''),
+        description: it?.description ? String(it.description) : '',
+        image: '',
+        video: '',
+        ingredients: '',
+        calories: '',
+        protein: '',
+        carbs: '',
+        fat: '',
+        price: typeof it?.price === 'number' ? it.price : Number(it?.price) || 0,
+        currency: it?.currency ? String(it.currency) : 'EUR',
+        allergens: Array.isArray(it?.allergens) ? it.allergens : [],
+        isVegan: Boolean(it?.vegan),
+        isVegetarian: false,
+        isGlutenFree: Boolean(it?.glutenFree),
+        isAvailable: true,
+      })),
+    }))
+  }
+
+  async function searchRestaurantsInDbByName(query) {
+    const q = normalizeTextForSearch(query)
+    if (!q) return []
+
+    const profile = 'municipality'
+    const res = await debugNormalized({ type: 'restaurant', profile })
+    const items = Array.isArray(res?.items) ? res.items : []
+
+    const results = items
+      .map((r) => ({
+        restaurantId: String(r?.restaurantId || ''),
+        name: r?.name ? String(r.name) : '',
+        timezone: r?.timezone ? String(r.timezone) : 'Europe/Madrid',
+      }))
+      .filter((r) => r.restaurantId)
+      .filter((r) => normalizeTextForSearch(r.name || r.restaurantId).includes(q))
+      .slice(0, 20)
+
+    return results
+  }
+
+  async function loadRestaurantFromDb(nextRestaurantId) {
+    const rid = String(nextRestaurantId || '').trim()
+    if (!rid) return
+
+    const profile = 'municipality'
+
+    try {
+      const profRes = await debugNormalized({ type: 'restaurant', restaurantId: rid, profile })
+      const profileItem = Array.isArray(profRes?.items) ? profRes.items[0] : null
+
+      const menuRes = await debugNormalized({ type: 'menu', restaurantId: rid, profile })
+      const menuItems = Array.isArray(menuRes?.items) ? menuRes.items : []
+
+      setRestaurantId(rid)
+
+      if (profileItem?.name) setRestaurantName(String(profileItem.name))
+      else setRestaurantName(rid)
+
+      if (profileItem?.cuisine) setRestaurantCuisine(String(profileItem.cuisine))
+      if (profileItem?.phone) setRestaurantPhone(String(profileItem.phone))
+      if (profileItem?.url) setRestaurantUrl(String(profileItem.url))
+      if (profileItem?.image) setRestaurantImage(String(profileItem.image))
+
+      const addr = profileItem?.address && typeof profileItem.address === 'object' ? profileItem.address : null
+      if (addr) {
+        if (addr.street) setRestaurantStreet(String(addr.street))
+        if (addr.city) setRestaurantCity(String(addr.city))
+        if (addr.postalCode) setRestaurantPostalCode(String(addr.postalCode))
+        if (addr.country) setRestaurantCountry(String(addr.country))
+      }
+
+      if (profileItem?.timezone) setRestaurantTimezone(String(profileItem.timezone))
+      if (Array.isArray(profileItem?.weeklySchedule) && profileItem.weeklySchedule.length) {
+        setRestaurantWeeklySchedule(profileItem.weeklySchedule)
+      }
+      if (Array.isArray(profileItem?.exceptions)) {
+        setRestaurantExceptions(profileItem.exceptions)
+      }
+
+      setSections(menuItemsToEditorSections(menuItems))
+      setActiveTab('editor')
+    } catch (err) {
+      alert(`No se pudo cargar el restaurante. ${toUserError(err)}`)
+      console.error(err)
+    }
+  }
 
   function handleLoadJson(event) {
     const file = event.target.files?.[0]
@@ -98,6 +249,9 @@ export default function App() {
           setRestaurantPostalCode(json.address.postalCode || '')
           setRestaurantCountry(json.address.addressCountry || 'ES')
         }
+
+        // Best-effort load of opening hours (if present in JSON-LD)
+        if (json.timezone) setRestaurantTimezone(String(json.timezone))
 
         const menuSections = json.hasMenu?.hasMenuSection || []
         const loadedSections = menuSections.map((sec) => ({
@@ -621,6 +775,66 @@ Responde SOLO con el JSON:`
   }
 
   const jsonLdObject = useMemo(() => {
+    const dayOfWeek = [
+      'https://schema.org/Sunday',
+      'https://schema.org/Monday',
+      'https://schema.org/Tuesday',
+      'https://schema.org/Wednesday',
+      'https://schema.org/Thursday',
+      'https://schema.org/Friday',
+      'https://schema.org/Saturday',
+    ]
+
+    const weekly = Array.isArray(restaurantWeeklySchedule) ? restaurantWeeklySchedule : []
+    const openingHoursSpecification = weekly
+      .flatMap((d) => {
+        const dow = typeof d?.day === 'number' ? d.day : null
+        const slots = Array.isArray(d?.slots) ? d.slots : []
+        if (dow === null || dow < 0 || dow > 6) return []
+        return slots
+          .filter((s) => s?.start && s?.end)
+          .map((s) => ({
+            '@type': 'OpeningHoursSpecification',
+            dayOfWeek: dayOfWeek[dow],
+            opens: String(s.start),
+            closes: String(s.end),
+          }))
+      })
+      .filter(Boolean)
+
+    const exceptions = Array.isArray(restaurantExceptions) ? restaurantExceptions : []
+    const specialOpeningHoursSpecification = exceptions
+      .flatMap((ex) => {
+        const startDate = ex?.startDate ? String(ex.startDate) : ''
+        const endDate = ex?.endDate ? String(ex.endDate) : ''
+        const validFrom = startDate
+        const validThrough = endDate || startDate
+        if (!validFrom) return []
+
+        if (ex?.type === 'closed') {
+          return [
+            {
+              '@type': 'OpeningHoursSpecification',
+              validFrom,
+              validThrough,
+              isClosed: true,
+            },
+          ]
+        }
+
+        const slots = Array.isArray(ex?.slots) ? ex.slots : []
+        return slots
+          .filter((s) => s?.start && s?.end)
+          .map((s) => ({
+            '@type': 'OpeningHoursSpecification',
+            validFrom,
+            validThrough,
+            opens: String(s.start),
+            closes: String(s.end),
+          }))
+      })
+      .filter(Boolean)
+
     const obj = {
       '@context': 'https://schema.org',
       '@type': 'Restaurant',
@@ -629,6 +843,9 @@ Responde SOLO con el JSON:`
       license: restaurantLicense || undefined,
       termsOfService: restaurantUrl ? `${restaurantUrl}/terminos` : undefined,
       'dataSharingScope': dataSharingScope,
+      timezone: restaurantTimezone || 'Europe/Madrid',
+      ...(openingHoursSpecification.length ? { openingHoursSpecification } : {}),
+      ...(specialOpeningHoursSpecification.length ? { specialOpeningHoursSpecification } : {}),
     }
     
     if (restaurantImage) obj.image = restaurantImage
@@ -703,6 +920,9 @@ Responde SOLO con el JSON:`
     restaurantPhone,
     restaurantUrl,
     restaurantCuisine,
+    restaurantTimezone,
+    restaurantWeeklySchedule,
+    restaurantExceptions,
     restaurantStreet,
     restaurantCity,
     restaurantPostalCode,
@@ -969,7 +1189,7 @@ ${jsonLdString}
             }`}
           >
             <Utensils className="h-4 w-4" />
-            Editor de Carta
+            Edición Restaurante
           </button>
 
           <button
@@ -1065,6 +1285,9 @@ ${jsonLdString}
 
         {activeTab === 'editor' && (
           <EditorTab
+            restaurantId={restaurantId}
+            searchRestaurantsInDbByName={searchRestaurantsInDbByName}
+            loadRestaurantFromDb={loadRestaurantFromDb}
             restaurantName={restaurantName}
             setRestaurantName={setRestaurantName}
             restaurantCuisine={restaurantCuisine}
@@ -1091,6 +1314,12 @@ ${jsonLdString}
             setRestaurantPostalCode={setRestaurantPostalCode}
             restaurantCountry={restaurantCountry}
             setRestaurantCountry={setRestaurantCountry}
+            restaurantTimezone={restaurantTimezone}
+            setRestaurantTimezone={setRestaurantTimezone}
+            weeklySchedule={restaurantWeeklySchedule}
+            setWeeklySchedule={setRestaurantWeeklySchedule}
+            exceptions={restaurantExceptions}
+            setExceptions={setRestaurantExceptions}
             newSectionName={newSectionName}
             setNewSectionName={setNewSectionName}
             addSection={addSection}
@@ -1132,11 +1361,53 @@ ${jsonLdString}
           />
         )}
 
-        {activeTab === 'datahub' && <DataHubTab editorState={{ sections }} />}
+        {activeTab === 'datahub' && (
+          <DataHubTab
+            editorState={{
+              sections,
+              restaurantName,
+              restaurantPhone,
+              restaurantUrl,
+              restaurantCuisine,
+              restaurantImage,
+              address: {
+                street: restaurantStreet,
+                city: restaurantCity,
+                postalCode: restaurantPostalCode,
+                country: restaurantCountry,
+              },
+              timezone: restaurantTimezone,
+              weeklySchedule: restaurantWeeklySchedule,
+              exceptions: restaurantExceptions,
+            }}
+          />
+        )}
 
         {activeTab === 'ayuntamientos' && <AyuntamientosTab />}
 
-        {activeTab === 'portal-ayuntamiento' && <AyuntamientoPortalTab editorState={{ sections }} />}
+        {activeTab === 'portal-ayuntamiento' && (
+          <ErrorBoundary>
+            <AyuntamientoPortalTab
+              editorState={{
+                sections,
+                restaurantName,
+                restaurantImage,
+                restaurantPhone,
+                restaurantUrl,
+                restaurantCuisine,
+                timezone: restaurantTimezone,
+                weeklySchedule: restaurantWeeklySchedule,
+                exceptions: restaurantExceptions,
+                address: {
+                  street: restaurantStreet,
+                  city: restaurantCity,
+                  postalCode: restaurantPostalCode,
+                  country: restaurantCountry,
+                },
+              }}
+            />
+          </ErrorBoundary>
+        )}
       </main>
 
       {showPdfModal && (

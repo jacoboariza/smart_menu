@@ -2,7 +2,7 @@ import { SpaceAdapter } from './SpaceAdapter.js'
 import { publish as publishToRepo, get as getFromRepo } from '../storage/publishedRepo.js'
 import { append as appendAudit } from '../storage/auditRepo.js'
 import { evaluateAccess } from '../policy/evaluateAccess.js'
-import { listMenuItems, listOccupancySignals } from '../storage/normalizedRepo.js'
+import { listMenuItems, listOccupancySignals, listRestaurants } from '../storage/normalizedRepo.js'
 
 export class GaiaXAdapterMock extends SpaceAdapter {
   constructor() {
@@ -63,6 +63,9 @@ export class GaiaXAdapterMock extends SpaceAdapter {
       return listMenuItems(ref.restaurantId)
     } else if (ref.source === 'occupancy') {
       return listOccupancySignals(ref.restaurantId)
+    } else if (ref.source === 'restaurant') {
+      const items = await listRestaurants(ref.restaurantId)
+      return items && items.length ? items[items.length - 1] : null
     }
 
     return null

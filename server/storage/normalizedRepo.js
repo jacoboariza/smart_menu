@@ -4,12 +4,14 @@ import path from 'path'
 const DATA_DIR = path.join(process.cwd(), 'server', 'storage', 'data')
 const MENU_FILE = path.join(DATA_DIR, 'normalized_menu_items.json')
 const OCC_FILE = path.join(DATA_DIR, 'normalized_occupancy_signals.json')
+const REST_FILE = path.join(DATA_DIR, 'normalized_restaurants.json')
 const TMP_MENU = `${MENU_FILE}.tmp`
 const TMP_OCC = `${OCC_FILE}.tmp`
+const TMP_REST = `${REST_FILE}.tmp`
 
 async function ensureFiles() {
   await fs.mkdir(DATA_DIR, { recursive: true })
-  for (const file of [MENU_FILE, OCC_FILE]) {
+  for (const file of [MENU_FILE, OCC_FILE, REST_FILE]) {
     try {
       await fs.access(file)
     } catch {
@@ -126,4 +128,42 @@ export async function listOccupancySignals(restaurantId) {
     return signals.filter((s) => s.restaurantId === restaurantId)
   }
   return signals
+}
+
+/**
+ * Upsert restaurant profiles deduping by restaurantId
+ * @param {Array} restaurants
+ * @returns {Promise<number>} number of upserted
+ */
+export async function upsertRestaurants(restaurants) {
+  const current = await loadJson(REST_FILE)
+  const key = (r) => String(r.restaurantId || '')
+  const map = new Map(current.map((r) => [key(r), r]))
+
+  let upserted = 0
+  for (const restaurant of restaurants) {
+    const k = key(restaurant)
+    if (!k) continue
+    const existed = map.has(k)
+    map.set(k, restaurant)
+    if (!existed) upserted += 1
+    else upserted += 1
+  }
+
+  const next = Array.from(map.values())
+  await safeWrite(REST_FILE, TMP_REST, next)
+  return upserted
+}
+
+/**
+ * List restaurant profiles, optionally filtered by restaurantId
+ * @param {string} [restaurantId]
+ * @returns {Promise<any[]>}
+ */
+export async function listRestaurants(restaurantId) {
+  const restaurants = await loadJson(REST_FILE)
+  if (restaurantId) {
+    return restaurants.filter((r) => r.restaurantId === restaurantId)
+  }
+  return restaurants
 }

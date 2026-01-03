@@ -5,6 +5,8 @@ import {
   upsertOccupancySignals,
   listMenuItems,
   listOccupancySignals,
+  upsertRestaurants,
+  listRestaurants,
 } from '../../server/storage/normalizedRepo.js'
 import { getById as getDataProduct, list as listDataProducts, upsert as upsertDataProduct } from '../../server/storage/dataProductRepo.js'
 import { list as listAudit } from '../../server/storage/auditRepo.js'
@@ -13,6 +15,7 @@ import { segitturAdapter } from '../../server/adapters/SegitturAdapterMock.js'
 import { gaiaXAdapter } from '../../server/adapters/GaiaXAdapterMock.js'
 import { buildMenuProduct } from '../../server/products/buildMenuProduct.js'
 import { buildOccupancyProduct } from '../../server/products/buildOccupancyProduct.js'
+import { buildRestaurantProduct } from '../../server/products/buildRestaurantProduct.js'
 import { validateDataProduct } from '../../server/domain/dataProduct.js'
 import {
   checkRateLimit,
@@ -165,6 +168,15 @@ export async function handler(event, context) {
   const method = event.httpMethod
   const path = event.path || ''
 
+  // CORS preflight handling
+  if (method === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: SECURITY_HEADERS,
+      body: '',
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Security checks (ISO 27001 A.12 - Operations Security)
   // ─────────────────────────────────────────────────────────────────────────
@@ -229,11 +241,23 @@ export async function handler(event, context) {
 
         const published = await listPublished(normalizedSpace.space)
         const menuProducts = published.filter((p) => p?.type === 'menu')
+        const restaurantProducts = published.filter((p) => p?.type === 'restaurant')
+
+        const restaurantProfileById = new Map()
+        for (const p of restaurantProducts) {
+          const rid = p?.payloadRef?.restaurantId || p?.metadata?.restaurantId
+          if (!rid) continue
+          const consumeRes = await adapter.consume(normalizedSpace.space, p.id, actor, 'discovery')
+          if (consumeRes?.denied) continue
+          if (consumeRes?.payload) restaurantProfileById.set(rid, consumeRes.payload)
+        }
 
         const restaurants = []
         for (const p of menuProducts) {
           const rid = p?.payloadRef?.restaurantId || p?.metadata?.restaurantId
           if (!rid) continue
+
+          const profile = restaurantProfileById.get(rid) || null
 
           const consumeRes = await adapter.consume(normalizedSpace.space, p.id, actor, 'discovery')
           if (consumeRes?.denied) continue
@@ -262,11 +286,14 @@ export async function handler(event, context) {
 
           restaurants.push({
             restaurantId: rid,
-            name: rid,
+            name: String(profile?.name || rid),
             glutenFree: anyGlutenFree,
             allergens: Array.from(allergensSet),
             updatedAt: p?.createdAt || null,
             menuItems,
+            timezone: profile?.timezone ? String(profile.timezone) : 'Europe/Madrid',
+            weeklySchedule: Array.isArray(profile?.weeklySchedule) ? profile.weeklySchedule : [],
+            exceptions: Array.isArray(profile?.exceptions) ? profile.exceptions : [],
           })
         }
 
@@ -445,18 +472,20 @@ export async function handler(event, context) {
       try {
         const params = event.queryStringParameters || {}
         const type = params.type
-        if (type !== 'menu' && type !== 'occupancy') {
+        if (type !== 'menu' && type !== 'occupancy' && type !== 'restaurant') {
           return buildResponse(400, {
             error: {
               code: 'invalid_type',
-              message: "type must be 'menu' or 'occupancy'",
+              message: "type must be 'menu' | 'occupancy' | 'restaurant'",
             },
           })
         }
 
         const items = type === 'menu'
           ? await listMenuItems(params.restaurantId || undefined)
-          : await listOccupancySignals(params.restaurantId || undefined)
+          : type === 'occupancy'
+            ? await listOccupancySignals(params.restaurantId || undefined)
+            : await listRestaurants(params.restaurantId || undefined)
 
         return buildResponse(200, { type, count: items.length, items })
       } catch (err) {
@@ -471,11 +500,11 @@ export async function handler(event, context) {
         const type = params.type
         const restaurantId = params.restaurantId
 
-        if (type && type !== 'menu' && type !== 'occupancy') {
+        if (type && type !== 'menu' && type !== 'occupancy' && type !== 'restaurant') {
           return buildResponse(404, {
             error: {
               code: 'unknown_type',
-              message: "type must be 'menu' or 'occupancy'",
+              message: "type must be 'menu' | 'occupancy' | 'restaurant'",
             },
           })
         }
@@ -527,11 +556,11 @@ export async function handler(event, context) {
   if (isDataProductsBuild(path)) {
     const { type, restaurantId, policyOverrides } = body || {}
 
-    if (type !== 'menu' && type !== 'occupancy') {
+    if (type !== 'menu' && type !== 'occupancy' && type !== 'restaurant') {
       return buildResponse(404, {
         error: {
           code: 'unknown_type',
-          message: "type must be 'menu' or 'occupancy'",
+          message: "type must be 'menu' | 'occupancy' | 'restaurant'",
         },
       })
     }
@@ -550,7 +579,9 @@ export async function handler(event, context) {
       const product =
         type === 'menu'
           ? await buildMenuProduct({ restaurantId, identity, policyOverrides })
-          : await buildOccupancyProduct({ restaurantId, identity, policyOverrides })
+          : type === 'occupancy'
+            ? await buildOccupancyProduct({ restaurantId, identity, policyOverrides })
+            : await buildRestaurantProduct({ restaurantId, identity, policyOverrides })
 
       return buildResponse(200, product)
     } catch (err) {
@@ -637,10 +668,12 @@ export async function handler(event, context) {
     try {
       const menuRecords = await listBySource('menu', orgId || undefined)
       const occupancyRecords = await listBySource('occupancy', orgId || undefined)
+      const restaurantRecords = await listBySource('restaurant', orgId || undefined)
 
       let processed = 0
       let menuItemsUpserted = 0
       let occupancySignalsUpserted = 0
+      let restaurantsUpserted = 0
 
       if (menuRecords.length) {
         const connector = getConnectorBySource('menu')
@@ -666,7 +699,19 @@ export async function handler(event, context) {
         }
       }
 
-      return buildResponse(200, { processed, menuItemsUpserted, occupancySignalsUpserted })
+      if (restaurantRecords.length) {
+        const connector = getConnectorBySource('restaurant')
+        for (const rec of restaurantRecords) {
+          const canonical = await connector.toCanonical(rec.payload, baseCtx)
+          if (canonical.restaurant) {
+            const added = await upsertRestaurants([canonical.restaurant])
+            restaurantsUpserted += added
+          }
+          processed += 1
+        }
+      }
+
+      return buildResponse(200, { processed, menuItemsUpserted, occupancySignalsUpserted, restaurantsUpserted })
     } catch (err) {
       return buildResponse(500, { error: { code: 'normalize_error', message: err.message || 'Normalization failed' } })
     }

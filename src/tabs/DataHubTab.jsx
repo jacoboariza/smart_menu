@@ -16,10 +16,12 @@ import {
   health,
   ingestMenu,
   ingestOccupancy,
+  ingestRestaurant,
   normalizeRun,
   toUserError,
 } from '../lib/apiClient.js'
 import { mapEditorStateToMenuIngest } from '../lib/mappers/menuMapper.js'
+import { mapEditorStateToRestaurantIngest } from '../lib/mappers/restaurantMapper.js'
 
 export default function DataHubTab({ editorState }) {
   const [apiKey, setApiKey] = useState('')
@@ -841,6 +843,33 @@ export default function DataHubTab({ editorState }) {
 
           <ActionButton
             onClick={() =>
+              runAction('Ingest restaurant (profile)', 'ingestRestaurant', async () => {
+                const payload = mapEditorStateToRestaurantIngest({
+                  restaurantId,
+                  name: undefined,
+                  phone: undefined,
+                  url: undefined,
+                  cuisine: undefined,
+                  image: undefined,
+                  address: undefined,
+                  timezone: 'Europe/Madrid',
+                  weeklySchedule: [],
+                  exceptions: [],
+                })
+                return ingestRestaurant(payload, { apiKey, orgId: orgId || undefined, roles: rolesSelected })
+              })
+            }
+            disabled={missingApiKey}
+            loading={loading.ingestRestaurant}
+            loadingText="Enviando…"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            icon={<Send className="h-4 w-4" />}
+          >
+            Ingest restaurante (perfil)
+          </ActionButton>
+
+          <ActionButton
+            onClick={() =>
               runAction('Normalize', 'normalize', () =>
                 normalizeRun({ apiKey, orgId: orgId || undefined, roles: rolesSelected }),
               )
@@ -1026,6 +1055,7 @@ export default function DataHubTab({ editorState }) {
               >
                 <option value="menu">menu</option>
                 <option value="occupancy">occupancy</option>
+                <option value="restaurant">restaurant</option>
               </select>
             </div>
 

@@ -18,6 +18,9 @@ export async function getMunicipalCatalog(space) {
     name: String(item?.name || ''),
     glutenFree: Boolean(item?.glutenFree),
     allergens: Array.isArray(item?.allergens) ? item.allergens.map(String) : [],
+    timezone: String(item?.timezone || 'Europe/Madrid'),
+    weeklySchedule: Array.isArray(item?.weeklySchedule) ? item.weeklySchedule : [],
+    exceptions: Array.isArray(item?.exceptions) ? item.exceptions : [],
     updatedAt: item?.updatedAt ? String(item.updatedAt) : null,
     menuItems: Array.isArray(item?.menuItems) ? item.menuItems.map((mi) => ({
       name: String(mi?.name || ''),
