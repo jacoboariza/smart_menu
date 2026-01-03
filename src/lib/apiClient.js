@@ -2,9 +2,13 @@ export function getApiBaseUrl() {
   const configured = import.meta.env?.VITE_API_BASE_URL
   if (configured && String(configured).trim()) return String(configured).trim()
   // Prefer the local Netlify dev server when running locally; fall back to relative path in prod
-  const isLocalhost = typeof window !== 'undefined' && window.location?.hostname === 'localhost'
-  if (isLocalhost) return 'http://localhost:8888/.netlify/functions/api'
+  if (isLocalDevHost()) return 'http://localhost:8888/.netlify/functions/api'
   return '/.netlify/functions/api'
+}
+
+function isLocalDevHost() {
+  const host = typeof window !== 'undefined' ? window.location?.hostname : ''
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
 }
 
 function joinUrl(baseUrl, path) {
@@ -79,21 +83,36 @@ function getMunicipalityDemoProfileEnabled() {
   return String(import.meta.env?.VITE_DEMO_MODE || '').trim() === 'true'
 }
 
+function safeSessionGet(key) {
+  try {
+    if (typeof sessionStorage === 'undefined') return null
+    return sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
 function resolveProfileDefaults({ apiKey, orgId, roles, profile } = {}) {
   if (profile !== 'municipality') return { apiKey, orgId, roles }
-  if (!getMunicipalityDemoProfileEnabled()) return { apiKey, orgId, roles }
 
+  const storedApiKey = safeSessionGet('dataHub.apiKey')
+  const storedOrgId = safeSessionGet('dataHub.orgId')
   const demoApiKey = String(import.meta.env?.VITE_DEMO_API_KEY || '').trim()
   const demoOrgId = String(import.meta.env?.VITE_DEMO_ORG_ID || '').trim()
+  const localDefaultKey = isLocalDevHost() ? 'key' : undefined
+
+  // Solo aplicar defaults si demoMode está habilitado o estamos en localhost
+  const shouldApplyDefaults = getMunicipalityDemoProfileEnabled() || isLocalDevHost()
+  if (!shouldApplyDefaults) return { apiKey, orgId, roles }
 
   return {
-    apiKey: apiKey || demoApiKey || undefined,
-    orgId: orgId || demoOrgId || undefined,
+    apiKey: apiKey || storedApiKey || demoApiKey || localDefaultKey,
+    orgId: orgId || storedOrgId || demoOrgId || undefined,
     roles: Array.isArray(roles) && roles.length ? roles : ['destination'],
   }
 }
 
-function buildHeaders({ apiKey, orgId, roles, profile } = {}) {
+export function buildHeaders({ apiKey, orgId, roles, profile } = {}) {
   const resolved = resolveProfileDefaults({ apiKey, orgId, roles, profile })
   const headers = {}
   if (resolved.apiKey) headers['X-API-Key'] = resolved.apiKey

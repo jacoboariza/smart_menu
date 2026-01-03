@@ -1,4 +1,4 @@
-import { request } from '../apiClient.js'
+import { request, buildHeaders } from '../apiClient.js'
 
 /**
  * Get municipality catalog (restaurants with menu data)
@@ -7,7 +7,9 @@ import { request } from '../apiClient.js'
  */
 export async function getMunicipalCatalog(space) {
   const params = new URLSearchParams({ space })
-  const response = await request(`/municipality/catalog?${params.toString()}`)
+  const response = await request(`/municipality/catalog?${params.toString()}`, {
+    headers: buildHeaders({ profile: 'municipality' }),
+  })
   
   const items = Array.isArray(response?.items) ? response.items : []
   
@@ -34,7 +36,9 @@ export async function getMunicipalCatalog(space) {
  */
 export async function getMunicipalOccupancy(space) {
   const params = new URLSearchParams({ space })
-  const response = await request(`/municipality/occupancy?${params.toString()}`)
+  const response = await request(`/municipality/occupancy?${params.toString()}`, {
+    headers: buildHeaders({ profile: 'municipality' }),
+  })
   
   const items = Array.isArray(response?.items) ? response.items : []
   
@@ -52,7 +56,9 @@ export async function getMunicipalOccupancy(space) {
  */
 export async function getMunicipalKpis(space) {
   const params = new URLSearchParams({ space })
-  const response = await request(`/municipality/kpis?${params.toString()}`)
+  const response = await request(`/municipality/kpis?${params.toString()}`, {
+    headers: buildHeaders({ profile: 'municipality' }),
+  })
   
   return {
     restaurantsPublished: Number(response?.restaurantsPublished || 0),
